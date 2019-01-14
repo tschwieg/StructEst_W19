@@ -1,0 +1,366 @@
+#+OPTIONS: toc:nil 
+#+TITLE: Structural Estimation Pset 2
+#+AUTHOR: Timothy Schwieg
+#+PROPERTY: header-args :cache yes :exports both :tangle yes
+#+PROPERTY: header-args:julia :session *julia*
+
+* Question One
+#+BEGIN_SRC julia
+  using Plots
+  using DataFrames
+  using CSV
+  using ForwardDiff
+  using Distributions
+
+  gr()
+#+END_SRC
+
+#+RESULTS[9a21d9bc5a9e5af58c20f6b0ad7635eb76e89d8b]:
+
+
+
+** a
+#+BEGIN_SRC julia
+  healthClaims = CSV.read( "clms.txt")
+
+  describe( healthClaims )
+
+  println( "Standard Deviation: ", std(healthClaims[:A]))
+
+  histogram( healthClaims.A, bins=1000, normalize = true)
+#+END_SRC
+
+#+BEGIN_SRC julia
+  truncatedHealthClaims = healthClaims[ healthClaims.A .<= 800 ]
+
+  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+#+END_SRC
+
+** b
+#+BEGIN_SRC julia
+  function GammaLogLikelihood( x::Vector{Float64}, α::Float64, β::Float64)
+      #Yes I know I could get this using Distributions.jl which could
+      #even do the MLE estimate But thats pretty much cheating, and
+      #gamma is in the exponential family so using Newton's method will
+      #cause no issues.
+
+      #Pdf is: $\frac{ 1 }{\Gamma(\alpha) \beta^{\alpha}} x^{\alpha - 1} \exp\left( - \frac{x}{\beta} \right)$
+      #Log-likelihood is: $- \alpha \log ( \beta) - \log( \Gamma (\alpha)) + (\alpha - 1) \log x - \frac{x}{\beta}$
+
+      return -α*log( β) - lgamma(α) + (α - 1)*mean(log.(x)) - mean(x) / β
+  end
+
+  function GammaGradient( x::Vector{Float64}, α::Float64, β::Float64)
+      delA = -log(β) - digamma(α) + mean(log.(x))
+      #delB = mean(x) / β - α
+      delB = mean(x) / β^2 - α / β
+      return [delA,delB]
+  end
+
+  function GammaHessian( x::Vector{Float64}, α::Float64, β::Float64)
+      delAA = -trigamma(α)
+      delAB = -1 / β
+      delBB =( α / (β*β)) - ((2* mean(x)) / (β*β*β))
+      return [delAA delAB; delAB delBB]
+  end
+
+  function GammaPDF( α::Float64, β::Float64, x::Float64)
+      return  (1 / (gamma(α)*β^α))*x^(α-1)*exp( -x/β)
+  end
+
+  function EstimateGammaParameters( data::Vector{Float64}, guess::Vector{Float64}, gradientFun, hessianFun)
+
+      θ = guess
+      tol = 1e-10
+      maxLoops = 100
+
+      grad = gradientFun( data, θ... )
+      hess = hessianFun( data, θ... )
+
+      loopCounter = 0
+      while( loopCounter < maxLoops && norm(grad) >= tol)
+          θ = θ - hess \ grad
+          grad = gradientFun( data, θ... )
+          hess = hessianFun( data, θ... )
+
+          loopCounter += 1
+          # println( norm(grad))
+          # println( θ)
+          # println( " ")
+      end
+      #println( loopCounter)
+      return θ
+  end
+
+
+  β₀ =  var(healthCosts) / mean(healthCosts)
+  α₀ = mean(healthCosts) / β₀
+
+  (α̂, β̂) = EstimateGammaParameters( healthCosts, [α₀, β₀], GammaGradient, GammaHessian)
+
+  likelihood = GammaLogLikelihood( α̂, β̂, healthCosts)
+
+  #TODO: Change this to the second histogram
+  histogram( healthCosts, bins = 1000, normalize=true)
+  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
+  pdfYVal = [GammaPDF( α̂, β̂, x ) for x in pdfXVal]
+
+  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
+
+
+#+END_SRC
+
+** c
+#+BEGIN_SRC julia
+  #I don't think this is the correct pdf?
+  function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
+      return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
+
+      #return (m * x^(m*β - 1) * exp( - (x / α)^m))/ (α^(m*β) * gamma( β ) )
+  end
+
+
+  function GGammaLikelihood( x::Vector{Float64}, α::Real, β::Real, m::Real)
+      return log(m) - α*log(β) + (α - 1)*mean(log.(x)) - (mean(x) / β)^m - lgamma( α / m )    
+  end
+
+
+
+  function GGammaGradient( x::Vector{Float64}, α::Float64, β::Float64, m::Float64)
+      delA = -log(β) + mean(log.(x)) - digamma( α / m) / m
+      #delB = - α / β - m*(( mean(x) / β)^(m-1))*(mean(x) / (β*β))
+      delB = ( m * (mean(x) / β)^m - α) / β
+      delM = 1.0 / m - log(mean(x) / β)*(mean(x) / β)^m + digamma( α / m)*(α / (m*m))
+      return [delA, delB, delM]
+  end
+
+  function GGammaHessian( x::Vector{Float64}, α::Float64, β::Float64, m::Float64)
+      delAA = -trigamma( α / m) / (m*m)
+      delAB = -1 / β
+      delAM = α * trigamma( α / m) / (m*m*m) + digamma( α / m) / (m*m)
+      delBB =  (α - m*(m+1)*(mean(x)/β)^m) / (β*β) 
+      #delBM = (mean(x)*(mean(x) / β)^(m-1)) / (β*β) + (m*mean(x)*(mean(x)/β)^(m-1) * log(mean(x) / β)) / (β*β)
+      delBM = ((mean(x)/β)^m * (1+m*log(mean(x)/β))) / β
+      delMM = -(α*α*trigamma(α / m)) / (m*m*m*m) - (2*α*digamma(α / m))/(m*m*m) - 1/(m*m) - (mean(x)/ β)^m * log(mean(x)/β)*log(mean(x)/β)
+      return [delAA delAB delAM; delAB delBB delBM; delAM delBM delMM]
+  end
+
+  function EstimateGG( data::Vector{Float64}, guess::Vector{Float64})
+      #To hard enforce that all of our parameters are positive, we exponentiate them
+      θ = log.(guess)
+      fun(x::Vector) = -GGammaLikelihood( test, exp.(x)... )
+
+
+
+      result = optimize(fun, θ, NewtonTrustRegion(), autodiff=:forward)
+  end
+
+
+#+END_SRC
+
+** d 
+#+BEGIN_SRC julia
+
+#+END_SRC
+
+** e
+Since the likelihood function values at the optimum for parts (b) and
+(c) are the constrained maximum likelihood estimators, the likelihood
+ratio test is simply: 
+#+BEGIN_SRC latex
+  \begin{equation*}
+    2 \left( f( \est{\theta} - \altest{\theta}) \right) \sim \chi_{p}^{2}
+  \end{equation*}
+#+END_SRC
+
+Where $p$ is the number of constraints in the estimation procedure. 
+
+** f
+
+* Question 2
+
+** a
+
+Equations (3) and (5) tell us that
+
+
+#+BEGIN_SRC latex
+  Equations (3) and (5)
+  $w_t - (1-\alpha) exp( z_t ) (k_t)^{\alpha-1} = 0$
+  $z_t = \rho z_{t-1} + (1-\rho)\mu + \epsilon_t$
+
+  Note that: $z_0 = \mu$ Therefore:
+  \begin{align*}
+    z_1 &= \mu + \epsilon_1\\
+    z_2 &= \mu + \rho\epsilon_1 + \epsilon_2\\
+    z_t &= \mu + \sum_{i=0}^{t-1} p^i \epsilon_{t-i}
+  \end{align*}
+
+  Combining these two together:
+
+  \begin{equation*}
+    w_t - (1-\alpha) exp \left( \mu + \sum_{i=0}^{t-1} p^i \epsilon_{t-i} \right) k_t^{\alpha} = 0
+  \end{equation*}
+
+  Taking logs and isolating the random component:
+  \begin{equation*}
+    \log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} p^i \epsilon_{t-i}
+  \end{equation*}
+
+  Note that the sum of iid distributed normal random variables is
+  distributed normal, where the variance is given by the sum of the
+  variances.
+
+  Thus
+  \begin{equation*}
+    \sum_{i=0}^{t-1} p^i \epsilon_{t-i} \sim \normal( 0, \sigma^2 \sum_{i=0}^{t-1} \rho^{2i}) =
+    \normal\left( 0, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
+  \end{equation*}
+
+  We may now estimate this model using Maximum Likelihood Estimation
+  #+END_SRC
+
+#+BEGIN_SRC julia
+  #$\log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} p^i \epsilon_{t-i}$
+  # Variance of error: $\sigma^2 \frac{1 - \rho^{2i}}{1-\rho}$
+
+  #Clean it up when it exists, comes in the order: (c, k, w, r)
+  macroData = CSV.read( "MacroSeries.txt")
+
+  w = macroData[:W]
+  k = macroData[:K]
+
+  function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
+      #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
+      #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
+
+      logLik = 0.0
+      #Note the way that the model is structured is: F(...) = 0, so we
+      #are maximizing the likelihood of getting a 0 returned for all the
+      #moments
+
+      for 1 in 1:N
+          mean = log(w[i]) - log( 1 - α) - μ - α*log( k[i])
+          var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
+          logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
+      end
+      return logLik
+  end
+
+  N = length(w)
+
+  α₀ = .5
+  β = .99
+  μ₀ = 1.0
+  σ₀ = 1.0
+  ρ₀ = 0.0
+
+  #We parameterize each of the variables so that they meet their constraints.
+  # tanh is used to ensure that $\rho \in (-1,1)$
+  θ = zeros(4)
+  θ[1] = log( α₀ / ( 1 - α₀) )
+  θ[2] = atanh( ρ₀)
+  θ[3] = log( μ₀ )
+  θ[4] = log( σ₀)
+
+
+  fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
+
+  result = optimize(fun, θ, BFGS(), autodiff=:forward)
+#+END_SRC
+
+** b
+
+#+BEGIN_SRC latex
+  Equations (4) and (5) read:
+  \begin{align*}
+    r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
+    z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t\\
+    \epsilon_t \sim \normal( 0, \sigma^2)
+  \end{align*}
+
+  From part (a) we know that (5) can be recursively solved to yield:
+  \begin{equation*}
+    z_t \sim \normal\left( \mu, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
+  \end{equation*}
+
+  Solving for $r_t$ then taking logs in equation (4)
+  \begin{align*}
+    \log r_t &= \log \alpha + z_t + (\alpha - 1 ) \log k_t\\
+  \end{align*}
+
+  This can be written as:
+  \begin{equation*}
+    F( r_t, k_t, \alpha, \mu, \sigma, \rho ) = 0
+  \end{equation*}
+
+  where the variance of the random variable described by $F$ is known,
+  and the same as the variance of $z_t$. Thus this system can be
+  estimated by MLE.
+#+END_SRC
+
+#+BEGIN_SRC julia
+  r = macroData[:R]
+  k = macroData[:K]
+
+  #$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
+
+  function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
+      #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
+      #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
+
+      logLik = 0.0
+      #Note the way that the model is structured is: F(...) = 0, so we
+      #are maximizing the likelihood of getting a 0 returned for all the
+      #moments
+
+      for 1 in 1:N
+          mean = log(r[i]) - log( α) - μ - (α - 1)*log( k[i])
+          var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
+          logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
+      end
+      return logLik
+  end
+
+  N = length(w)
+
+  α₀ = .5
+  β = .99
+  μ₀ = 1.0
+  σ₀ = 1.0
+  ρ₀ = 0.0
+
+  #We parameterize each of the variables so that they meet their constraints.
+  # tanh is used to ensure that $\rho \in (-1,1)$
+  θ = zeros(4)
+  θ[1] = log( α₀ / ( 1 - α₀) )
+  θ[2] = atanh( ρ₀)
+  θ[3] = log( μ₀ )
+  θ[4] = log( σ₀)
+
+
+  fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
+
+  result = optimize(fun, θ, BFGS(), autodiff=:forward)
+
+#+END_SRC
+
+** c
+#+BEGIN_SRC latex
+  From the derivation of the distribution of $\log r_t$ in part (b):
+
+  \begin{align*}
+      \Pr( r_t > 1) &= \Pr( \log r_t > 0)\\
+                    &= \Pr( \log \alpha + z_t + (\alpha - 1)\log k_t > 0)\\
+                    &= \Pr( \log \alpha + \rho z_{t-1} + (1 - \rho)\mu + \epsilon_t + (\alpha-1) \log k_t > 0)\\
+      &= \Pr( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + \frac{Z}{\sigma} + (\alpha-1) \log k_t
+        > 0)\\
+                    &= \Pr( Z > - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t))\\
+      &= 1 - \Pr( Z \leq - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log
+        k_t))\\
+                    &= \inv{ \Phi}( - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t )\\
+      &\approx \inv{\Phi}( -\est{\sigma} ( \log \est{\alpha}) + \est{\rho}10 + (1-\est{\rho})
+        \est{\mu} + (\alpha - 1) \log( 7,500,000) )\\
+      &= ???
+    \end{align*}
+#+END_SRC

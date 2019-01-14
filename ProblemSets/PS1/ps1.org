@@ -1,0 +1,70 @@
+#+OPTIONS: toc:nil 
+#+TITLE: Structural Estimation Pset 1
+#+AUTHOR: Timothy Schwieg
+#+LaTeX_CLASS: paper
+#+LaTeX_CLASS_OPTIONS: [12pt, letterpaper]
+#+LATEX_HEADER: \usepackage{natbib}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+PROPERTY: header-args :cache yes :exports both :tangle yes
+#+PROPERTY: header-args:julia :session *julia*
+
+* Structural Estimation is better than reduced-form
+While Structural Estimation does rely upon assumptions, particularly
+about the exact form of the endogeneity, it is explicit about what
+these are, rather than implicitly making them. The form of these
+assumptions is also usually economic rather than statistical. Economic
+assumptions are easier to evaluate /a priori/ than statistical ones,
+as these statistical assumptions must have theory applied to them to
+be evaluated. 
+
+The major problem with reduced-form estimation is that it has moved
+its "extreme" assumptions from parametric assumptions such as function
+forms and distributions to implicit instrument assumptions. As Keane
+states, instruments can only be viewed as exogenous when viewed
+through the lens of some theory, so they can never be taken as
+"letting the data speak for itself." However these assumptions are now
+implicit and not as spelled out, so it can be very easy to miss that
+the instruments perhaps are not as powerful as they seem, as is the
+case of draft lotteries still being endogenous to earnings. 
+
+As Keane says on page 5, "If the work is to guide future policy, it is
+important to understand what mechanism was at work." That is,
+structural estimation serves to estimate primitives, of which there is
+an economic, rather than statistical interpretation. This allows for
+prediction to made about future policy changes, which are not
+achievable by reduced-form estimation. Rust echos this when he says
+"the statistical model typically cannot tell us anything about
+[behavioral] response[s] to hypothetical policy changes that have not
+yet occurred." Only structural techniques are invariant to the Lucas
+Critique.
+
+Structural Estimation builds Causality into the model, rather than
+trying to infer it "from the data." It is explicit where the
+assumptions are made to derive this causality, rather than implicitly
+made, such as monotonicty, or homogeneity among the
+population. While this does lead to mis-specification error, that
+problem is not removed by changing to the often-linear reduced form
+estimations used by many economists. Even strongly non-linear reduced
+form models such as gradient boosting and random forests suffer from
+mis-specification error. 
+
+* However, it is not free from problems related to Instruments
+Structural estimation, particularly in the empirical IO literature is
+quite reliant on the use of Instrumental variable estimation. This is
+due to both simultaneity problems as well as signaling aspects such
+as unobserved quality being correlated with price. Keane especially
+treats assaults upon instruments as assaults upon reduced-form
+econometrics, but these techniques are used within structural models
+as well. 
+
+The empirical IO literature is especially known for its use of bad
+instruments, ones that are very difficult to treat as exogenous. The
+famous Haussman instruments in particular are difficult to believe
+in. They require the different markets to be close enough that they
+are using the same distribution networks, and thus will be correlated
+on cost, but different enough that there can be no common shocks to
+demand causing the price changes. I find this extremely hard to
+believe, particularly in their initial application: beer
+sales. Neither side seems able to address the fact that some of the
+problems that they lay at the feet of reduced-form estimation come
+from structural estimation being done poorly.
