@@ -4,8 +4,15 @@
 #+PROPERTY: header-args :cache yes :exports both :tangle yes
 #+PROPERTY: header-args:julia :session *julia*
 
+#+LaTeX_CLASS: paper
+#+LaTeX_CLASS_OPTIONS: [12pt, letterpaper]
+
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage{fontspec}
+#+LATEX_HEADER: \setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+
 * Question One
-#+BEGIN_SRC julia
+#+BEGIN_SRC julia :exports none
   using Plots
   using DataFrames
   using CSV
@@ -13,36 +20,43 @@
   using Distributions
   using SpecialFunctions
   using Optim
+  using LinearAlgebra
+  using QuadGK
 
-  gr()
+
+  pyplot()
 #+END_SRC
 
-#+RESULTS[9a21d9bc5a9e5af58c20f6b0ad7635eb76e89d8b]:
+#+RESULTS[31ebdf22ff153e45b336e151a24228192a2aa19e]:
 
 
 
 ** a
-#+BEGIN_SRC julia :results value graphics  :file histOne.png
+#+BEGIN_SRC julia :results graphics  :file histOne.png
   healthClaims = CSV.read( "clms.txt", header=[:A] )
   describe( healthClaims )
 
   println( "Standard Deviation: ", std(healthClaims[:A]))
 
   histogram( healthClaims[:A], bins=1000, normalize = true)
+  savefig("histOne.png")
 #+END_SRC
 
 #+RESULTS[cf0208b3a87514c902f763f1d4a6235fac710dc5]:
 [[file:histOne.png]]
 
-#+BEGIN_SRC julia :results value graphics :file histTwo.png
+#+BEGIN_SRC julia :results graphics :file histTwo.png
   truncatedHealthClaims = healthClaims[healthClaims[:A] .<= 800, 1]
 
 
   histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  savefig("histTwo.png")
 #+END_SRC
 
 #+RESULTS[0cd35e9a95d3a6b7fd34328fcd5a0ac4c48923f8]:
 [[file:histTwo.png]]
+
+
 
 ** b
 #+BEGIN_SRC julia :results value
@@ -104,37 +118,38 @@
   β₀ =  var(healthCosts) / mean(healthCosts)
   α₀ = mean(healthCosts) / β₀
 
-  (α̂, β̂) = EstimateGammaParameters( healthCosts, [α₀, β₀], GammaGradient, GammaHessian)
+  (Gamma_̂α, Gamma_̂β) = EstimateGammaParameters( healthCosts, [α₀, β₀], GammaGradient, GammaHessian)
 
-  likelihood = GammaLogLikelihood(  healthCosts, α̂, β̂)
+  likelihood = GammaLogLikelihood(  healthCosts, Gamma_̂α, Gamma_̂β)
 
-  println( "α̂ = ", α̂)
-  println( "β̂ = ", β̂)
-
-  println( "Likelihood Value: ", likelihood)
-
+  result = [["\$\\est{\\alpha}\$: ", "\$\\est{\\beta}\$: ", "Likelihood: " ] [ Gamma_̂α,  Gamma_̂β, likelihood]]
 
 
 #+END_SRC
 
-#+RESULTS[cbb858dbc71e0cfec0888a8215f1ede78da24b32]:
+#+RESULTS[0cf91764fe2c4d515f8906af0ff05688c58c4810]:
+| $\alpha$:        | 1.1397564780585858 |
+| $\beta$:        |  174.8688733959653 |
+| Likelihood: |  -6.28964508639924 |
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_Gamma.png
 
 histogram( truncatedHealthClaims, bins = 100, normalize = true)
-#  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
-pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
-pdfYVal = [GammaPDF( α̂, β̂, x ) for x in pdfXVal]
+pdfXVal = range( minimum(truncatedHealthClaims)+5, maximum(truncatedHealthClaims))
+#pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
 
-plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
 
+plot!( pdfXVal, pdfYVal, label="Gamma Estimate" )
+savefig("histPDF_Gamma.png")
 #+END_SRC
 
-#+RESULTS[1a0783e0536900767dffb68de96f6a952ef7b929]:
-[[file:histPDF.png]]
+#+RESULTS[47a580823bfd7a949cb40bf5d2fa7d8a144bc4de]:
+[[file:histPDF_Gamma.png]]
 
-** c
+* c
 #+BEGIN_SRC julia
+
   #I don't think this is the correct pdf?
   function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
       return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
@@ -147,7 +162,7 @@ plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
       return log(m) - α*log(β) + (α - 1)*mean(log.(x)) - mean( (x ./ β).^m  ) - lgamma( α / m )    
   end
 
-  function EstimateGG( data::Vector {Float64}, guess::Vector{Float64})
+  function EstimateGG( data::Vector{Float64}, guess::Vector{Float64})
       #To hard enforce that all of our parameters are positive, we
       #exponentiate them
       θ = log.(guess)
@@ -155,36 +170,41 @@ plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
 
 
 
-      result = optimize(fun, θ, Newton(), autodiff=:forward)
+      result = optimize(fun, θ, ConjugateGradient(), autodiff=:forward)
   end
 
-  sln = EstimateGG( healthCosts, [α̂, β̂, 1.0])
+  sln = EstimateGG( healthCosts, [Gamma_̂α, Gamma_̂β, 1.0])
 
-  GG_α̂ = exp(sln.minimizer[1])
-  GG_β̂ = exp(sln.minimizer[2])
-  GG_m̂ = exp(sln.minimizer[3])
+  GG_̂α = exp(sln.minimizer[1])
+  GG_̂β = exp(sln.minimizer[2])
+  GG_̂m = exp(sln.minimizer[3])
   GG_LogLikelihood = -sln.minimum
 
-  println( "GG α̂ = ", GG_α̂)
-  println( "GG β̂ = ", GG_β̂ )
-  println( "GG m̂ = ", GG_m̂ )
+  println( "GG ̂α = ", GG_̂α)
+  println( "GG ̂β = ", GG_̂β )
+  println( "GG ̂m = ", GG_̂m )
   println( "Likelihood Value: ", GG_LogLikelihood )
 
+  result = [["GG \$\\est{\\alpha}\$: ", "GG \$\\est{\\beta}\$: ", "GG \$\\est{m}\$: ","GG Likelihood: " ] [ GG_̂α,  GG_̂β,  GG_̂m, GG_LogLikelihood]]
 #+END_SRC
 
-#+RESULTS[df9c08031e79574bb7e8284753b7a3130cb2c403]:
+#+RESULTS[9839249467e17c5c6ef4828ee1d51d77387fa491]:
+| GG $\est{\alpha}$:  | 1.1755020098846642 |
+| GG $\est{\beta}$:  | 156.18446475134172 |
+| GG $\est{m}$:  | 0.9498167064643459 |
+| GG Likelihood: | -6.289560051458711 |
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_GG.png
   histogram( truncatedHealthClaims, bins = 100, normalize = true)
-  #  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
-  pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
-  pdfYVal = [GGammaPDF( α̂, β̂, m̂, x ) for x in pdfXVal]
+  pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
 
-  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
-
+  plot!( pdfXVal, pdfYVal, label="Generalized Gamma Estimate" )
+  savefig( "histPDF_GG.png" )
 #+END_SRC
 
-#+RESULTS[a85e6d36cc5daf6495954ec566e465f49a8c771e]:
+#+RESULTS[011f985639a09b8acfb6161dd7e95be608a72e5c]:
 [[file:histPDF_GG.png]]
 
 
@@ -212,76 +232,87 @@ plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
       result = optimize(fun, θ, NewtonTrustRegion(), autodiff=:forward, Optim.Options(iterations=2000) )
   end
 
-  sln = EstimateGG( healthCosts, [GG_α̂, GG_β̂, GG_m̂, 10000])
+  sln = EstimateGBetaTwo( healthCosts, [GG_̂α, GG_̂β, GG_̂m, 10000])
 
-  GB2_α̂ = exp( sln.minimizer[1])
-  GB2_β̂ = exp( sln.minimizer[2])
-  GB2_p̂ = exp( sln.minimizer[3])
-  GB2_q̂ = exp( sln.minimizer[4])
+  GB2_̂α = exp( sln.minimizer[1])
+  GB2_̂β = exp( sln.minimizer[2])
+  GB2_̂p = exp( sln.minimizer[3])
+  GB2_̂q = exp( sln.minimizer[4])
   GB2_LogLikelihood = -sln.minimum
 
-  println( "GB2 α̂: ", GB2_α̂)
-  println( "GB2 β̂: ", GB2_β̂)
-  println( "GB2 p̂: ", GB2_p̂)
-  println( "GB2 q̂: ", GB2_q̂)
-  println( "GB2 Likelihood: ", -sln.minimum)
+  result = [["GB2 \$\\est{\\alpha}\$: ", "GB2 \$\\est{\\beta}\$: ", "GB2 \$\\est{p}\$: ","GB2 \$\\est{q}\$: ","GB2 Likelihood: " ] [GB2_̂α, GB2_̂β,  GB2_̂p,  GB2_̂q, -sln.minimum]]
 #+END_SRC
 
-#+RESULTS[58d8e6eb7f3743e2e323556dc5fac0a3a3203592]:
+#+RESULTS[17bfc789838528e4471433cf3487a6b55d21858f]:
+| GB2 $\est{\alpha}$:  |   0.9498180950429491 |
+| GB2 $\est{\beta}$:  | 1.0983701276884081e9 |
+| GB2 $\est{p}$:  |   1.2376067626960379 |
+| GB2 $\est{q}$:  |  3.187929333688613e6 |
+| GB2 Likelihood: |   -6.289560054356965 |
 
-#+BEGIN_SRC julia  :results value graphics :file histPDF_GB2.png
-
+#+BEGIN_SRC julia  :results graphics :file histPDF_GB2.png
   histogram( truncatedHealthClaims, bins = 100, normalize = true)
-  #  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
-  pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
-  pdfYVal = [GBetaTwoPDF( x, GB2_α̂, GB2_β̂, GB2_p̂, GB2_q̂ ) for x in pdfXVal]
+  pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
 
-  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
-
+  plot!( pdfXVal, pdfYVal, label="Generalized Beta 2 Estimate" )
+  savefig( "histPDF_GB2.png" )
 #+END_SRC
 
-#+RESULTS[d56e724cda9cbae1c570ff235ae85eabdcc697e0]:
+#+RESULTS[dbd713097797600bc651caa557c6afd2557fe259]:
 [[file:histPDF_GB2.png]]
-
 
 ** e
 Since the likelihood function values at the optimum for parts (b) and
 (c) are the constrained maximum likelihood estimators, the likelihood
 ratio test is simply: 
-#+BEGIN_SRC latex
+#+BEGIN_EXPORT latex
   \begin{equation*}
     2 \left( f( \est{\theta} - \altest{\theta}) \right) \sim \chi_{p}^{2}
   \end{equation*}
-#+END_SRC
+#+END_EXPORT
 
 Where $p$ is the number of constraints in the estimation procedure. 
 #+BEGIN_SRC julia
+
+  # Gamma Has Two restrictions
   tStatGamma = 2*(GB2_LogLikelihood - likelihood)
+  # Generalized Gamma Has One Restriction
   tStatGG = 2*(GB2_LogLikelihood - GG_LogLikelihood)
 
+  results = [["", "Gamma", "Generalized Gamma"] [ "\$\\chi^{2}\$", tStatGamma, tStatGG] ["p-value",  cdf(Chisq(2),tStatGamma), cdf( Chisq(1),tStatGG) ] ]
 #+END_SRC
+
+#+RESULTS[f641fe6ea16aa19e1c19728a8d3047ad9ca91a5a]:
+|                   |                   $\chi^{2}$ |              p-value |
+| Gamma             | 0.00017006408454989241 | 8.502842715330726e-5 |
+| Generalized Gamma |  -5.796508162347891e-9 |                  0.0 |
+
 ** f
 The Probability that someone has a health care claim of more than
 \$1000 is given by:
 
-#+BEGIN_SRC latex
+#+BEGIN_EXPORT latex
   \begin{align*}
     \Pr( X > 1000) &= 1 - \Pr( X \leq 1000)\\
                    &= \int_0^{1000}f_Xdx
   \end{align*}
-#+END_SRC
+#+END_EXPORT
 
 However, since the integral of a Generalized Beta 2 Distribution is
 quite nasty, we will compute it numerically.
 
 #+BEGIN_SRC julia
-  f(x) = GBetaTwoPDF( x, GB2_α̂, GB2_β̂, GB2_p̂, GB2_q̂ )
+  f(x) = GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q )
   area = quadgk( f, 0, 1000 )[1]
-
-  println( "Probability of Having > 1000: ", 1 - area)
+  output = ["Probability of Having > 1000: " (1-area)]
 #+END_SRC
 
-#+RESULTS[620af1bbba61233521d012777b6367cdefedf5d8]:
+#+RESULTS[5945c0655dd27e27a6d8c430eac7867eaf1e7941]:
+| Probability of Having > 1000: | 0.00507829692428996 |
+
+
 
 * Question 2
 
@@ -290,51 +321,53 @@ quite nasty, we will compute it numerically.
 Equations (3) and (5) tell us that
 
 
-#+BEGIN_SRC latex
-  Equations (3) and (5)
-  $w_t - (1-\alpha) exp( z_t ) (k_t)^{\alpha-1} = 0$
-  $z_t = \rho z_{t-1} + (1-\rho)\mu + \epsilon_t$
+#+BEGIN_EXPORT latex
+\begin{align*}
+  w_t - (1-\alpha) exp( z_t ) (k_t)^{\alpha-1} &= 0\\
+  z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t
+\end{align*}
 
-  Note that: $z_0 = \mu$ Therefore:
-  \begin{align*}
-    z_1 &= \mu + \epsilon_1\\
-    z_2 &= \mu + \rho\epsilon_1 + \epsilon_2\\
-    z_t &= \mu + \sum_{i=0}^{t-1} p^i \epsilon_{t-i}
-  \end{align*}
 
-  Combining these two together:
+Note that: $z_0 = \mu$ Therefore:
+\begin{align*}
+  z_1 &= \mu + \epsilon_1\\
+  z_2 &= \mu + \rho\epsilon_1 + \epsilon_2\\
+  z_t &= \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
+\end{align*}
 
-  \begin{equation*}
-    w_t - (1-\alpha) exp \left( \mu + \sum_{i=0}^{t-1} p^i \epsilon_{t-i} \right) k_t^{\alpha} = 0
-  \end{equation*}
+Combining these two together:
 
-  Taking logs and isolating the random component:
-  \begin{equation*}
-    \log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} p^i \epsilon_{t-i}
-  \end{equation*}
+\begin{equation*}
+  w_t - (1-\alpha) exp \left( \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \right) k_t^{\alpha} = 0
+\end{equation*}
 
-  Note that the sum of iid distributed normal random variables is
-  distributed normal, where the variance is given by the sum of the
-  variances.
+Taking logs and isolating the random component:
+\begin{equation*}
+  \log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
+\end{equation*}
 
-  Thus
-  \begin{equation*}
-    \sum_{i=0}^{t-1} p^i \epsilon_{t-i} \sim \normal( 0, \sigma^2 \sum_{i=0}^{t-1} \rho^{2i}) =
-    \normal\left( 0, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
-  \end{equation*}
+Note that the sum of iid distributed normal random variables is
+distributed normal, where the variance is given by the sum of the
+variances.
 
-  We may now estimate this model using Maximum Likelihood Estimation
-  #+END_SRC
+Thus
+\begin{equation*}
+  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \sim \normal( 0, \sigma^2 \sum_{i=0}^{t-1} \rho^{2i}) =
+  \normal\left( 0, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
+\end{equation*}
+
+We may now estimate this model using Maximum Likelihood Estimation
+  #+END_EXPORT
 
 #+BEGIN_SRC julia
-  #$\log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} p^i \epsilon_{t-i}$
+  #$\log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}$
   # Variance of error: $\sigma^2 \frac{1 - \rho^{2i}}{1-\rho}$
 
   #Clean it up when it exists, comes in the order: (c, k, w, r)
-  macroData = CSV.read( "MacroSeries.txt")
+  macroData = CSV.read( "MacroSeries.txt", header=[:C,:K,:W,:R])
 
-  w = macroData[:W]
-  k = macroData[:K]
+  w = convert( Vector{Float64}, macroData[:W] )
+  k = convert( Vector{Float64}, macroData[:K] )
 
   function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
       #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
@@ -345,7 +378,9 @@ Equations (3) and (5) tell us that
       #are maximizing the likelihood of getting a 0 returned for all the
       #moments
 
-      for 1 in 1:N
+      #Note we do not have the -.5*log(2*pi)
+      #Because that does not matter at all for MLE estimation.
+      for i in 1:N
           mean = log(w[i]) - log( 1 - α) - μ - α*log( k[i])
           var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
           logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
@@ -372,12 +407,26 @@ Equations (3) and (5) tell us that
 
   fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
 
-  result = optimize(fun, θ, BFGS(), autodiff=:forward)
+  result = optimize(fun, θ, LBFGS(), autodiff=:forward)
+
+  model_̂θ = result.minimizer
+
+  model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
+  model_̂ρ = tanh(model_̂θ[2])
+  model_̂μ = exp(model_̂θ[3])
+  model_̂σ = exp(model_̂θ[4])
+
+  output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
 #+END_SRC
 
-** b
+#+RESULTS:
+| α̂  |  0.9999999999985967 |
+| ρ̂  |                 0.0 |
+| μ̂  |  27.626774841787046 |
+| σ²̂ | 0.01003725876812115 |
+* b
 
-#+BEGIN_SRC latex
+#+BEGIN_EXPORT latex
   Equations (4) and (5) read:
   \begin{align*}
     r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
@@ -403,11 +452,11 @@ Equations (3) and (5) tell us that
   where the variance of the random variable described by $F$ is known,
   and the same as the variance of $z_t$. Thus this system can be
   estimated by MLE.
-#+END_SRC
+#+END_EXPORT
 
 #+BEGIN_SRC julia
-  r = macroData[:R]
-  k = macroData[:K]
+  r = convert( Vector{Float64}, macroData[:R] )
+  k = convert( Vector{Float64}, macroData[:K] )
 
   #$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
 
@@ -420,7 +469,7 @@ Equations (3) and (5) tell us that
       #are maximizing the likelihood of getting a 0 returned for all the
       #moments
 
-      for 1 in 1:N
+      for i in 1:N
           mean = log(r[i]) - log( α) - μ - (α - 1)*log( k[i])
           var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
           logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
@@ -434,7 +483,7 @@ Equations (3) and (5) tell us that
   β = .99
   μ₀ = 1.0
   σ₀ = 1.0
-  ρ₀ = 0.0
+  ρ₀ = .99
 
   #We parameterize each of the variables so that they meet their constraints.
   # tanh is used to ensure that $\rho \in (-1,1)$
@@ -447,12 +496,20 @@ Equations (3) and (5) tell us that
 
   fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
 
-  result = optimize(fun, θ, BFGS(), autodiff=:forward)
+  result = optimize(fun, θ, Newton(), autodiff=:forward)
 
+  model_̂θ = result.minimizer
+
+  model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
+  model_̂ρ = tanh(model_̂θ[2])
+  model_̂μ = exp(model_̂θ[3])
+  model_̂σ = exp(model_̂θ[4])
+
+  output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
 #+END_SRC
 
 ** c
-#+BEGIN_SRC latex
+#+BEGIN_EXPORT latex
   From the derivation of the distribution of $\log r_t$ in part (b):
 
   \begin{align*}
@@ -464,9 +521,16 @@ Equations (3) and (5) tell us that
                     &= \Pr( Z > - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t))\\
       &= 1 - \Pr( Z \leq - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log
         k_t))\\
-                    &= \inv{ \Phi}( - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t )\\
-      &\approx \inv{\Phi}( -\est{\sigma} ( \log \est{\alpha}) + \est{\rho}10 + (1-\est{\rho})
-        \est{\mu} + (\alpha - 1) \log( 7,500,000) )\\
-      &= ???
+                    &= \inv{ \Phi}( - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t ))\\
+      &\approx \inv{\Phi}( -\est{\sigma} ( \log \est{\alpha} + \est{\rho}10 + (1-\est{\rho})
+        \est{\mu} + (\est{\alpha} - 1) \log( 7,500,000) ))\\
     \end{align*}
+#+END_EXPORT
+
+#+BEGIN_SRC julia
+    prob = cdf( Normal(), -sqrt(model_̂σ)*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
+  result = ["Prob" prob]
 #+END_SRC
+
+#+RESULTS:
+| Prob | 0.21644022445230773 |
