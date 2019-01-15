@@ -11,6 +11,8 @@
   using CSV
   using ForwardDiff
   using Distributions
+  using SpecialFunctions
+  using Optim
 
   gr()
 #+END_SRC
@@ -20,24 +22,30 @@
 
 
 ** a
-#+BEGIN_SRC julia
-  healthClaims = CSV.read( "clms.txt")
-
+#+BEGIN_SRC julia :results value graphics  :file histOne.png
+  healthClaims = CSV.read( "clms.txt", header=[:A] )
   describe( healthClaims )
 
   println( "Standard Deviation: ", std(healthClaims[:A]))
 
-  histogram( healthClaims.A, bins=1000, normalize = true)
+  histogram( healthClaims[:A], bins=1000, normalize = true)
 #+END_SRC
 
-#+BEGIN_SRC julia
-  truncatedHealthClaims = healthClaims[ healthClaims.A .<= 800 ]
+#+RESULTS[cf0208b3a87514c902f763f1d4a6235fac710dc5]:
+[[file:histOne.png]]
+
+#+BEGIN_SRC julia :results value graphics :file histTwo.png
+  truncatedHealthClaims = healthClaims[healthClaims[:A] .<= 800, 1]
+
 
   histogram( truncatedHealthClaims, bins = 100, normalize = true)
 #+END_SRC
 
+#+RESULTS[0cd35e9a95d3a6b7fd34328fcd5a0ac4c48923f8]:
+[[file:histTwo.png]]
+
 ** b
-#+BEGIN_SRC julia
+#+BEGIN_SRC julia :results value
   function GammaLogLikelihood( x::Vector{Float64}, α::Float64, β::Float64)
       #Yes I know I could get this using Distributions.jl which could
       #even do the MLE estimate But thats pretty much cheating, and
@@ -91,24 +99,39 @@
       #println( loopCounter)
       return θ
   end
-
+  healthCosts = convert(  Vector{Float64}, truncatedHealthClaims )#healthClaims[:A] )
 
   β₀ =  var(healthCosts) / mean(healthCosts)
   α₀ = mean(healthCosts) / β₀
 
   (α̂, β̂) = EstimateGammaParameters( healthCosts, [α₀, β₀], GammaGradient, GammaHessian)
 
-  likelihood = GammaLogLikelihood( α̂, β̂, healthCosts)
+  likelihood = GammaLogLikelihood(  healthCosts, α̂, β̂)
 
-  #TODO: Change this to the second histogram
-  histogram( healthCosts, bins = 1000, normalize=true)
-  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
-  pdfYVal = [GammaPDF( α̂, β̂, x ) for x in pdfXVal]
+  println( "α̂ = ", α̂)
+  println( "β̂ = ", β̂)
 
-  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
+  println( "Likelihood Value: ", likelihood)
+
 
 
 #+END_SRC
+
+#+RESULTS[cbb858dbc71e0cfec0888a8215f1ede78da24b32]:
+
+#+BEGIN_SRC julia  :results value graphics :file histPDF_Gamma.png
+
+histogram( truncatedHealthClaims, bins = 100, normalize = true)
+#  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
+pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+pdfYVal = [GammaPDF( α̂, β̂, x ) for x in pdfXVal]
+
+plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
+
+#+END_SRC
+
+#+RESULTS[1a0783e0536900767dffb68de96f6a952ef7b929]:
+[[file:histPDF.png]]
 
 ** c
 #+BEGIN_SRC julia
@@ -121,47 +144,105 @@
 
 
   function GGammaLikelihood( x::Vector{Float64}, α::Real, β::Real, m::Real)
-      return log(m) - α*log(β) + (α - 1)*mean(log.(x)) - (mean(x) / β)^m - lgamma( α / m )    
+      return log(m) - α*log(β) + (α - 1)*mean(log.(x)) - mean( (x ./ β).^m  ) - lgamma( α / m )    
   end
 
-
-
-  function GGammaGradient( x::Vector{Float64}, α::Float64, β::Float64, m::Float64)
-      delA = -log(β) + mean(log.(x)) - digamma( α / m) / m
-      #delB = - α / β - m*(( mean(x) / β)^(m-1))*(mean(x) / (β*β))
-      delB = ( m * (mean(x) / β)^m - α) / β
-      delM = 1.0 / m - log(mean(x) / β)*(mean(x) / β)^m + digamma( α / m)*(α / (m*m))
-      return [delA, delB, delM]
-  end
-
-  function GGammaHessian( x::Vector{Float64}, α::Float64, β::Float64, m::Float64)
-      delAA = -trigamma( α / m) / (m*m)
-      delAB = -1 / β
-      delAM = α * trigamma( α / m) / (m*m*m) + digamma( α / m) / (m*m)
-      delBB =  (α - m*(m+1)*(mean(x)/β)^m) / (β*β) 
-      #delBM = (mean(x)*(mean(x) / β)^(m-1)) / (β*β) + (m*mean(x)*(mean(x)/β)^(m-1) * log(mean(x) / β)) / (β*β)
-      delBM = ((mean(x)/β)^m * (1+m*log(mean(x)/β))) / β
-      delMM = -(α*α*trigamma(α / m)) / (m*m*m*m) - (2*α*digamma(α / m))/(m*m*m) - 1/(m*m) - (mean(x)/ β)^m * log(mean(x)/β)*log(mean(x)/β)
-      return [delAA delAB delAM; delAB delBB delBM; delAM delBM delMM]
-  end
-
-  function EstimateGG( data::Vector{Float64}, guess::Vector{Float64})
-      #To hard enforce that all of our parameters are positive, we exponentiate them
+  function EstimateGG( data::Vector {Float64}, guess::Vector{Float64})
+      #To hard enforce that all of our parameters are positive, we
+      #exponentiate them
       θ = log.(guess)
-      fun(x::Vector) = -GGammaLikelihood( test, exp.(x)... )
+      fun(x::Vector) = -GGammaLikelihood( data, exp.(x)... )
 
 
 
-      result = optimize(fun, θ, NewtonTrustRegion(), autodiff=:forward)
+      result = optimize(fun, θ, Newton(), autodiff=:forward)
   end
 
+  sln = EstimateGG( healthCosts, [α̂, β̂, 1.0])
+
+  GG_α̂ = exp(sln.minimizer[1])
+  GG_β̂ = exp(sln.minimizer[2])
+  GG_m̂ = exp(sln.minimizer[3])
+  GG_LogLikelihood = -sln.minimum
+
+  println( "GG α̂ = ", GG_α̂)
+  println( "GG β̂ = ", GG_β̂ )
+  println( "GG m̂ = ", GG_m̂ )
+  println( "Likelihood Value: ", GG_LogLikelihood )
 
 #+END_SRC
+
+#+RESULTS[df9c08031e79574bb7e8284753b7a3130cb2c403]:
+
+#+BEGIN_SRC julia  :results value graphics :file histPDF_GG.png
+  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  #  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
+  pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  pdfYVal = [GGammaPDF( α̂, β̂, m̂, x ) for x in pdfXVal]
+
+  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
+
+#+END_SRC
+
+#+RESULTS[a85e6d36cc5daf6495954ec566e465f49a8c771e]:
+[[file:histPDF_GG.png]]
+
 
 ** d 
 #+BEGIN_SRC julia
+  function GBetaTwoPDF( x::Float64, a::Real, b::Real, p::Real, q::Real)
+      #We require all parameters to be positive, so abs(a) = a
+      return a*x^(a*p -1) / (b^(a*p) *beta(p,q)*(1+(x/b)^a)^(p+q))
+  end
+
+  function GBetaTwoLikelihood( x::Vector{Float64}, a::Real, b::Real, p::Real, q::Real)
+      return log( a) + (a*p -1)*mean(log.(x)) - (a*p)*log(b) - log(beta(p,q)) - (p+q)*mean( log.( 1 .+(x ./ b).^a ))
+  end
+
+  function EstimateGBetaTwo( data::Vector{Float64}, guess::Vector{Float64})
+        #To hard enforce that all of our parameters are positive, we
+        #exponentiate them
+      θ = log.(guess)
+      #θ = guess
+      fun(x::Vector) = -GBetaTwoLikelihood( data, exp.(x)... )
+
+
+      #This guy is being fickle, and Newton() would not converge
+      #LBFGS converges, but to a higher value than Newton()
+      result = optimize(fun, θ, NewtonTrustRegion(), autodiff=:forward, Optim.Options(iterations=2000) )
+  end
+
+  sln = EstimateGG( healthCosts, [GG_α̂, GG_β̂, GG_m̂, 10000])
+
+  GB2_α̂ = exp( sln.minimizer[1])
+  GB2_β̂ = exp( sln.minimizer[2])
+  GB2_p̂ = exp( sln.minimizer[3])
+  GB2_q̂ = exp( sln.minimizer[4])
+  GB2_LogLikelihood = -sln.minimum
+
+  println( "GB2 α̂: ", GB2_α̂)
+  println( "GB2 β̂: ", GB2_β̂)
+  println( "GB2 p̂: ", GB2_p̂)
+  println( "GB2 q̂: ", GB2_q̂)
+  println( "GB2 Likelihood: ", -sln.minimum)
+#+END_SRC
+
+#+RESULTS[58d8e6eb7f3743e2e323556dc5fac0a3a3203592]:
+
+#+BEGIN_SRC julia  :results value graphics :file histPDF_GB2.png
+
+  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  #  pdfXVal = range( minimum(healthCosts), maximum(healthCosts))
+  pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
+  pdfYVal = [GBetaTwoPDF( x, GB2_α̂, GB2_β̂, GB2_p̂, GB2_q̂ ) for x in pdfXVal]
+
+  plot!( pdfXVal, pdfYVal, label="MLE Estimate" )
 
 #+END_SRC
+
+#+RESULTS[d56e724cda9cbae1c570ff235ae85eabdcc697e0]:
+[[file:histPDF_GB2.png]]
+
 
 ** e
 Since the likelihood function values at the optimum for parts (b) and
@@ -174,8 +255,33 @@ ratio test is simply:
 #+END_SRC
 
 Where $p$ is the number of constraints in the estimation procedure. 
+#+BEGIN_SRC julia
+  tStatGamma = 2*(GB2_LogLikelihood - likelihood)
+  tStatGG = 2*(GB2_LogLikelihood - GG_LogLikelihood)
 
+#+END_SRC
 ** f
+The Probability that someone has a health care claim of more than
+\$1000 is given by:
+
+#+BEGIN_SRC latex
+  \begin{align*}
+    \Pr( X > 1000) &= 1 - \Pr( X \leq 1000)\\
+                   &= \int_0^{1000}f_Xdx
+  \end{align*}
+#+END_SRC
+
+However, since the integral of a Generalized Beta 2 Distribution is
+quite nasty, we will compute it numerically.
+
+#+BEGIN_SRC julia
+  f(x) = GBetaTwoPDF( x, GB2_α̂, GB2_β̂, GB2_p̂, GB2_q̂ )
+  area = quadgk( f, 0, 1000 )[1]
+
+  println( "Probability of Having > 1000: ", 1 - area)
+#+END_SRC
+
+#+RESULTS[620af1bbba61233521d012777b6367cdefedf5d8]:
 
 * Question 2
 
