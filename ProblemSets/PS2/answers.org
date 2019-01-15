@@ -15,7 +15,7 @@
 #+BEGIN_SRC julia :exports none
   using Plots
   using DataFrames
-  using CSV
+  using CSVFiles
   using ForwardDiff
   using Distributions
   using SpecialFunctions
@@ -27,33 +27,47 @@
   pyplot()
 #+END_SRC
 
-#+RESULTS[31ebdf22ff153e45b336e151a24228192a2aa19e]:
+#+RESULTS[7790b12090bf6af3b25172eccd8a0303cfc0ec8b]:
 
 
 
 ** a
+#+BEGIN_SRC julia 
+  #healthClaims = CSV.read( "clms.txt", header=[:A] )
+  healthClaims = DataFrame(load("clms.csv", header_exists=false, colnames=["A"]))
+  #describe( healthClaims )
+
+  #println( "Standard Deviation: ", std(healthClaims[:A]))
+
+  results = [["mean", "min", "median", "max", "StdDev"] [mean(healthClaims[:A]), minimum(healthClaims[:A]), median(healthClaims[:A]), maximum(healthClaims[:A]), std(healthClaims[:A])]]
+#+END_SRC
+
+#+RESULTS[a08677b006c6ecac5d8b70f23689ccf46d9a43ed]:
+| mean   |  720.2779753272437 |
+| min    |               0.01 |
+| median |             172.21 |
+| max    | 227967.25000000003 |
+| StdDev | 3972.8508241194463 |
+
 #+BEGIN_SRC julia :results graphics  :file histOne.png
-  healthClaims = CSV.read( "clms.txt", header=[:A] )
-  describe( healthClaims )
-
-  println( "Standard Deviation: ", std(healthClaims[:A]))
-
   histogram( healthClaims[:A], bins=1000, normalize = true)
   savefig("histOne.png")
 #+END_SRC
 
-#+RESULTS[cf0208b3a87514c902f763f1d4a6235fac710dc5]:
+#+RESULTS[3dd520f05a48a965777c0a514ee944095490b689]:
 [[file:histOne.png]]
 
 #+BEGIN_SRC julia :results graphics :file histTwo.png
   truncatedHealthClaims = healthClaims[healthClaims[:A] .<= 800, 1]
 
-
-  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  # Doing this will make them sum to one
+  #histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  #We force all bins to have length 8, and allow for 100 of them.
+  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
   savefig("histTwo.png")
 #+END_SRC
 
-#+RESULTS[0cd35e9a95d3a6b7fd34328fcd5a0ac4c48923f8]:
+#+RESULTS[460d53cdec988dbb11aeeab1d8d77ca61efb850f]:
 [[file:histTwo.png]]
 
 
@@ -134,7 +148,7 @@
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_Gamma.png
 
-histogram( truncatedHealthClaims, bins = 100, normalize = true)
+histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims)+5, maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
@@ -149,12 +163,9 @@ savefig("histPDF_Gamma.png")
 
 * c
 #+BEGIN_SRC julia
-
-  #I don't think this is the correct pdf?
+  # $\text{(GG):}\quad f(x;\alpha,\beta,m) = \frac{m}{\beta^\alpha \Gamma\left(\frac{\alpha}{m}\right)}x^{\alpha-1}e^{-\left(\frac{x}{\beta}\right)^m},\quad x\in[0,\infty), \:\alpha,\beta,m>0$
   function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
       return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
-
-      #return (m * x^(m*β - 1) * exp( - (x / α)^m))/ (α^(m*β) * gamma( β ) )
   end
 
 
@@ -195,7 +206,7 @@ savefig("histPDF_Gamma.png")
 | GG Likelihood: | -6.289560051458711 |
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_GG.png
-  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
   pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
@@ -251,7 +262,7 @@ savefig("histPDF_Gamma.png")
 | GB2 Likelihood: |   -6.289560054356965 |
 
 #+BEGIN_SRC julia  :results graphics :file histPDF_GB2.png
-  histogram( truncatedHealthClaims, bins = 100, normalize = true)
+  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
   pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
@@ -327,131 +338,145 @@ Equations (3) and (5) tell us that
   z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t
 \end{align*}
 
-
-Note that: $z_0 = \mu$ Therefore:
+Taking logs of equation (3):
 \begin{align*}
-  z_1 &= \mu + \epsilon_1\\
-  z_2 &= \mu + \rho\epsilon_1 + \epsilon_2\\
-  z_t &= \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
+  \log w_t &= \log ( 1- \alpha) + z_t + (\alpha-1) \log k_t\\
+  z_t &= \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t
 \end{align*}
 
-Combining these two together:
+This tells us that for $t > 1$
+\begin{align*}
+  \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
+                                             (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log
+    k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
 
+For $t=1$
 \begin{equation*}
-  w_t - (1-\alpha) exp \left( \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \right) k_t^{\alpha} = 0
+  \log w_1 - \log ( 1- \alpha) - (\alpha-1) \log k_t \sim \normal( \mu, \sigma^2)
 \end{equation*}
 
-Taking logs and isolating the random component:
-\begin{equation*}
-  \log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
-\end{equation*}
-
-Note that the sum of iid distributed normal random variables is
-distributed normal, where the variance is given by the sum of the
-variances.
-
-Thus
-\begin{equation*}
-  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \sim \normal( 0, \sigma^2 \sum_{i=0}^{t-1} \rho^{2i}) =
-  \normal\left( 0, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
-\end{equation*}
 
 We may now estimate this model using Maximum Likelihood Estimation
   #+END_EXPORT
 
 #+BEGIN_SRC julia
-  #$\log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}$
-  # Variance of error: $\sigma^2 \frac{1 - \rho^{2i}}{1-\rho}$
+    #$\normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)$
 
-  #Clean it up when it exists, comes in the order: (c, k, w, r)
-  macroData = CSV.read( "MacroSeries.txt", header=[:C,:K,:W,:R])
+    #Clean it up when it exists, comes in the order: (c, k, w, r)
+    macroData = DataFrame(load("MacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R"]))
 
-  w = convert( Vector{Float64}, macroData[:W] )
-  k = convert( Vector{Float64}, macroData[:K] )
+    w = convert( Vector{Float64}, macroData[:W] )
+    k = convert( Vector{Float64}, macroData[:K] )
 
-  function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
-      #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
-      #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
+    function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
+        #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
+        #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
 
-      logLik = 0.0
-      #Note the way that the model is structured is: F(...) = 0, so we
-      #are maximizing the likelihood of getting a 0 returned for all the
-      #moments
+        logLik = -.5*log(σ²)- ( log(w[1]) - log(1-α) - (1-α)*log(k[1]) - μ)^2 / (2*σ²)
+        #Note the way that the model is structured is: F(...) = 0, so we
+        #are maximizing the likelihood of getting a 0 returned for all the
+        #moments
 
-      #Note we do not have the -.5*log(2*pi)
-      #Because that does not matter at all for MLE estimation.
-      for i in 1:N
-          mean = log(w[i]) - log( 1 - α) - μ - α*log( k[i])
-          var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
-          logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
-      end
-      return logLik
-  end
+        #Note we do not have the -.5*log(2*pi)
+        #Because that does not matter at all for MLE estimation.
+        for i in 2:N
+            mean = ρ*(log(w[i-1]) - log( 1 - α)  - (α-1)*log( k[i-1])) + (1-ρ)*μ
+            logLik += -.5*log( σ² ) - (  (log(w[i]) - log(1-α) - (1-α)*log(k[i]) - mean)^2 / (2*σ²))
+        end
+        return logLik
+    end
 
-  N = length(w)
+    N = length(w)
 
-  α₀ = .5
-  β = .99
-  μ₀ = 1.0
-  σ₀ = 1.0
-  ρ₀ = 0.0
+    α₀ = .5
+    β = .99
+    μ₀ = 1.0
+    σ₀ = 1.0
+    ρ₀ = 0.0
 
-  #We parameterize each of the variables so that they meet their constraints.
-  # tanh is used to ensure that $\rho \in (-1,1)$
-  θ = zeros(4)
-  θ[1] = log( α₀ / ( 1 - α₀) )
-  θ[2] = atanh( ρ₀)
-  θ[3] = log( μ₀ )
-  θ[4] = log( σ₀)
+    #We parameterize each of the variables so that they meet their constraints.
+    # tanh is used to ensure that $\rho \in (-1,1)$
+    θ = zeros(4)
+    θ[1] = log( α₀ / ( 1 - α₀) )
+    θ[2] = atanh( ρ₀)
+    θ[3] = log( μ₀ )
+    θ[4] = log( σ₀)
 
 
-  fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
+    fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
 
-  result = optimize(fun, θ, LBFGS(), autodiff=:forward)
+    result = optimize(fun, θ, Newton(), autodiff=:forward)
 
-  model_̂θ = result.minimizer
+    model_̂θ = result.minimizer
 
-  model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
-  model_̂ρ = tanh(model_̂θ[2])
-  model_̂μ = exp(model_̂θ[3])
-  model_̂σ = exp(model_̂θ[4])
+    model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
+    model_̂ρ = tanh(model_̂θ[2])
+    model_̂μ = exp(model_̂θ[3])
+    model_̂σ = exp(model_̂θ[4])
 
-  output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
+    output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
 #+END_SRC
 
-#+RESULTS:
-| α̂  |  0.9999999999985967 |
-| ρ̂  |                 0.0 |
-| μ̂  |  27.626774841787046 |
-| σ²̂ | 0.01003725876812115 |
+#+RESULTS[987437bbb9a2e67c15739f65e71ce10c17f97e20]:
+| $\est{\alpha}$:  |   0.11279736091788892 |
+| $\est{\rho}$:  | 0.0013757752571974219 |
+| $\est{\mu}$:  |     2.198742765991596 |
+| $\est{\sigma^{2}}$: |   0.00950021304635493 |
+
 * b
 
 #+BEGIN_EXPORT latex
-  Equations (4) and (5) read:
-  \begin{align*}
-    r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
-    z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t\\
-    \epsilon_t \sim \normal( 0, \sigma^2)
-  \end{align*}
+Taking logs of equation (3):
+\begin{align*}
+  \log w_t &= \log ( 1- \alpha) + z_t + (\alpha-1) \log k_t\\
+  z_t &= \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t
+\end{align*}
 
-  From part (a) we know that (5) can be recursively solved to yield:
-  \begin{equation*}
-    z_t \sim \normal\left( \mu, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
-  \end{equation*}
+This tells us that for $t > 1$
+\begin{align*}
+  \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
+                                             (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log
+    k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
 
-  Solving for $r_t$ then taking logs in equation (4)
-  \begin{align*}
-    \log r_t &= \log \alpha + z_t + (\alpha - 1 ) \log k_t\\
-  \end{align*}
+For $t=1$
+\begin{equation*}
+  \log w_1 - \log ( 1- \alpha) - (\alpha-1) \log k_t \sim \normal( \mu, \sigma^2)
+\end{equation*}
 
-  This can be written as:
-  \begin{equation*}
-    F( r_t, k_t, \alpha, \mu, \sigma, \rho ) = 0
-  \end{equation*}
 
-  where the variance of the random variable described by $F$ is known,
-  and the same as the variance of $z_t$. Thus this system can be
-  estimated by MLE.
+We may now estimate this model using Maximum Likelihood Estimation
+
+Equations (4) and (5) read:
+\begin{align*}
+  r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
+  z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t\\
+  \epsilon_t \sim \normal( 0, \sigma^2)
+\end{align*}
+
+Taking logs and isolating $z_t$
+\begin{align*}
+  \log r_t  &= \log \alpha + (\alpha-1) \log k_t + z_t\\
+  z_t &= \log \alpha + (\alpha-1) \log k_t - \log r_t
+\end{align*}
+
+For $t > 1$:
+\begin{align*}
+  \log \alpha + (\alpha-1) \log k_t - \log r_t &\sim \normal\left( \rho z_{t-1} +
+                                       (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log \alpha + (\alpha-1)\log k_{t-1} - \log r_{t-1}
+    \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
+
+For $t = 1$:
+\begin{equation*}
+  \log \alpha + (\alpha-1)\log k_1 - \log r_1 \sim \normal( \mu, \sigma^2)
+\end{equation*}
+
+This can be estimated using an MLE.
 #+END_EXPORT
 
 #+BEGIN_SRC julia
@@ -464,28 +489,33 @@ We may now estimate this model using Maximum Likelihood Estimation
       #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
       #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
 
-      logLik = 0.0
+      logLik = -.5*log(σ²) - (log(α) + (α-1)*log(k[1]) - log(r[1]) - μ)^2 / (2*σ² )
       #Note the way that the model is structured is: F(...) = 0, so we
       #are maximizing the likelihood of getting a 0 returned for all the
       #moments
 
-      for i in 1:N
-          mean = log(r[i]) - log( α) - μ - (α - 1)*log( k[i])
-          var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
-          logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
+      for i in 2:N
+          mean = ρ*(log(α) + (α-1)*log(k[i-1]) - log(r[i-1])) + (1-ρ)*μ
+          logLik += -.5*log( σ² ) - (  (log(α) + (α-1)*log(k[i]) - log(r[i]) - mean)^2 / (2*σ²))
       end
       return logLik
   end
 
   N = length(w)
 
-  α₀ = .5
-  β = .99
-  μ₀ = 1.0
-  σ₀ = 1.0
-  ρ₀ = .99
+  # α₀ = .5
+  # β = .99
+  # μ₀ = 1.0
+  # σ₀ = 1.0
+  # ρ₀ = .99
+    α₀ = .5
+    β = .99
+    μ₀ = 1.0
+    σ₀ = 1.0
+    ρ₀ = 0.0
 
-  #We parameterize each of the variables so that they meet their constraints.
+  # #We param
+  eterize each of the variables so that they meet their constraints.
   # tanh is used to ensure that $\rho \in (-1,1)$
   θ = zeros(4)
   θ[1] = log( α₀ / ( 1 - α₀) )
@@ -507,6 +537,12 @@ We may now estimate this model using Maximum Likelihood Estimation
 
   output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
 #+END_SRC
+
+#+RESULTS[02ce635043dc9ba4ba67a742aa3de844328d38ac]:
+| $\est{\alpha}$:  |                    1 |
+| $\est{\rho}$:  |  0.26158802254436014 |
+| $\est{\mu}$:  | 9793456505444984e-30 |
+| $\est{\sigma^{2}}$: | 0.009480777698471455 |
 
 ** c
 #+BEGIN_EXPORT latex
@@ -532,5 +568,5 @@ We may now estimate this model using Maximum Likelihood Estimation
   result = ["Prob" prob]
 #+END_SRC
 
-#+RESULTS:
-| Prob | 0.21644022445230773 |
+#+RESULTS[7c2b2c01a3390e497eadcabe955f7c6a47a97230]:
+| Prob | 0.39947494113405524 |
