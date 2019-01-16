@@ -26,11 +26,8 @@
   pyplot()
 #+END_SRC
 
-<<<<<<< HEAD
-#+RESULTS[d9a04dc345372a5c8cef2dcac7414b013142ffc8]:
-=======
+
 #+RESULTS[7790b12090bf6af3b25172eccd8a0303cfc0ec8b]:
->>>>>>> 5ca0fc2aa2640788724f8d58cc288aa465239775
 
 
 
@@ -45,12 +42,12 @@
   results = [["mean", "min", "median", "max", "StdDev"] [mean(healthClaims[:A]), minimum(healthClaims[:A]), median(healthClaims[:A]), maximum(healthClaims[:A]), std(healthClaims[:A])]]
 #+END_SRC
 
-#+RESULTS[a08677b006c6ecac5d8b70f23689ccf46d9a43ed]:
-| mean   |  720.2779753272437 |
-| min    |               0.01 |
-| median |             172.21 |
-| max    | 227967.25000000003 |
-| StdDev | 3972.8508241194463 |
+#+RESULTS[4408f91b86a619c803335cb651f09814d7102c10]:
+| mean   | 720.2779753272437 |
+| min    |              0.01 |
+| median |            172.21 |
+| max    |         227967.25 |
+| StdDev | 3972.850824119446 |
 
 #+BEGIN_SRC julia :results graphics  :file histOne.png
   histogram( healthClaims[:A], bins=1000, normalize = true)
@@ -66,15 +63,12 @@
   # Doing this will make them sum to one
   #histogram( truncatedHealthClaims, bins = 100, normalize = true)
   #We force all bins to have length 8, and allow for 100 of them.
-  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+  histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
   savefig("histTwo.png")
+
 #+END_SRC
 
-<<<<<<< HEAD
-#+RESULTS[bb2f487c39233211adb1223c0b971fe1cdd6cb62]:
-=======
-#+RESULTS[460d53cdec988dbb11aeeab1d8d77ca61efb850f]:
->>>>>>> 5ca0fc2aa2640788724f8d58cc288aa465239775
+#+RESULTS[7e284f20ee40d3008c609c4cdd578c56138e25f4]:
 [[file:histTwo.png]]
 
 
@@ -154,7 +148,7 @@
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_Gamma.png
 
-histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims)+5, maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
@@ -213,7 +207,7 @@ savefig("histPDF_Gamma.png")
 | GG Likelihood: | -6.289560051458711 |
 
 #+BEGIN_SRC julia  :results value graphics :file histPDF_GG.png
-  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+  histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
   pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
@@ -270,7 +264,7 @@ savefig("histPDF_Gamma.png")
 | GB2 Likelihood: |  -6.289560054045967 |
 
 #+BEGIN_SRC julia  :results graphics :file histPDF_GB2.png
-  histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+  histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
   pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]

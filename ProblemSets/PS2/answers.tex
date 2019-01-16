@@ -1,4 +1,4 @@
-% Created 2019-01-15 Tue 11:04
+% Created 2019-01-15 Tue 21:03
 % Intended LaTeX compiler: pdflatex
 \documentclass[12pt, letterpaper]{paper}
 \usepackage[utf8]{inputenc}
@@ -14,7 +14,7 @@
 \usepackage{amssymb}
 \usepackage{capt-of}
 \usepackage{hyperref}
-\usepackage{fontspec}
+\usepackage{Schwieg}
 \usepackage{natbib}
 \usepackage{tikz}
 \usepackage{bm}
@@ -30,17 +30,17 @@
  pdftitle={Structural Estimation Pset 2},
  pdfkeywords={},
  pdfsubject={},
- pdfcreator={Emacs 26.1.50 (Org mode 9.1.9)}, 
+ pdfcreator={Emacs 26.1 (Org mode 9.1.9)}, 
  pdflang={English}}
 \begin{document}
 
 \maketitle
 
 \section{Question One}
-\label{sec:org9967813}
+\label{sec:orgb4f4da2}
 \subsection{a}
-\label{sec:org28ccc09}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\label{sec:orgb6af895}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 #healthClaims = CSV.read( "clms.txt", header=[:A] )
 healthClaims = DataFrame(load("clms.csv", header_exists=false, colnames=["A"]))
 #describe( healthClaims )
@@ -55,12 +55,12 @@ results = [["mean", "min", "median", "max", "StdDev"] [mean(healthClaims[:A]), m
 mean & 720.2779753272437\\
 min & 0.01\\
 median & 172.21\\
-max & 227967.25000000003\\
-StdDev & 3972.8508241194463\\
+max & 227967.25\\
+StdDev & 3972.850824119446\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 histogram( healthClaims[:A], bins=1000, normalize = true)
 savefig("histOne.png")
 \end{minted}
@@ -69,14 +69,15 @@ savefig("histOne.png")
 \includegraphics[width=.9\linewidth]{histOne.png}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 truncatedHealthClaims = healthClaims[healthClaims[:A] .<= 800, 1]
 
 # Doing this will make them sum to one
 #histogram( truncatedHealthClaims, bins = 100, normalize = true)
 #We force all bins to have length 8, and allow for 100 of them.
-histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
 savefig("histTwo.png")
+
 \end{minted}
 
 \begin{center}
@@ -86,8 +87,8 @@ savefig("histTwo.png")
 
 
 \subsection{b}
-\label{sec:orgec2160f}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\label{sec:orgceaf874}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 function GammaLogLikelihood( x::Vector{Float64}, α::Float64, β::Float64)
     #Yes I know I could get this using Distributions.jl which could
     #even do the MLE estimate But thats pretty much cheating, and
@@ -152,7 +153,6 @@ likelihood = GammaLogLikelihood(  healthCosts, Gamma_̂α, Gamma_̂β)
 
 result = [["\$\\est{\\alpha}\$: ", "\$\\est{\\beta}\$: ", "Likelihood: " ] [ Gamma_̂α,  Gamma_̂β, likelihood]]
 
-
 \end{minted}
 
 \begin{center}
@@ -163,9 +163,9 @@ Likelihood: & -6.28964508639924\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 
-histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims)+5, maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
@@ -180,8 +180,8 @@ savefig("histPDF_Gamma.png")
 \end{center}
 
 \section{c}
-\label{sec:org730c01d}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\label{sec:orge2c0c7f}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 # $\text{(GG):}\quad f(x;\alpha,\beta,m) = \frac{m}{\beta^\alpha \Gamma\left(\frac{\alpha}{m}\right)}x^{\alpha-1}e^{-\left(\frac{x}{\beta}\right)^m},\quad x\in[0,\infty), \:\alpha,\beta,m>0$
 function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
     return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
@@ -216,19 +216,20 @@ println( "GG ̂m = ", GG_̂m )
 println( "Likelihood Value: ", GG_LogLikelihood )
 
 result = [["GG \$\\est{\\alpha}\$: ", "GG \$\\est{\\beta}\$: ", "GG \$\\est{m}\$: ","GG Likelihood: " ] [ GG_̂α,  GG_̂β,  GG_̂m, GG_LogLikelihood]]
+
 \end{minted}
 
 \begin{center}
 \begin{tabular}{lr}
-GG \(\est{\alpha}\): & 1.175501926156338\\
-GG \(\est{\beta}\): & 156.18450458248918\\
-GG \(\est{m}\): & 0.9498168104965249\\
+GG \(\est{\alpha}\): & 1.1755020098846642\\
+GG \(\est{\beta}\): & 156.18446475134172\\
+GG \(\est{m}\): & 0.9498167064643459\\
 GG Likelihood: & -6.289560051458711\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
-histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
@@ -243,12 +244,14 @@ savefig( "histPDF_GG.png" )
 
 
 \subsection{d}
-\label{sec:org901e8dc}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\label{sec:org1d93659}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 function GBetaTwoPDF( x::Float64, a::Real, b::Real, p::Real, q::Real)
     #We require all parameters to be positive, so abs(a) = a
     return a*x^(a*p -1) / (b^(a*p) *beta(p,q)*(1+(x/b)^a)^(p+q))
 end
+
+#$GG(\alpha,\beta,m) = \lim_{q\rightarrow\infty}GB2\left(a=m,b=q^{1/m}\beta,p=\frac{\alpha}{m},q\right)$
 
 function GBetaTwoLikelihood( x::Vector{Float64}, a::Real, b::Real, p::Real, q::Real)
     return log( a) + (a*p -1)*mean(log.(x)) - (a*p)*log(b) - log(beta(p,q)) - (p+q)*mean( log.( 1 .+(x ./ b).^a ))
@@ -266,8 +269,7 @@ function EstimateGBetaTwo( data::Vector{Float64}, guess::Vector{Float64})
     #LBFGS converges, but to a higher value than Newton()
     result = optimize(fun, θ, NewtonTrustRegion(), autodiff=:forward, Optim.Options(iterations=2000) )
 end
-
-sln = EstimateGBetaTwo( healthCosts, [GG_̂α, GG_̂β, GG_̂m, 10000])
+sln = EstimateGBetaTwo( healthCosts, [GG_̂m, 10000^(1 / GG_̂m) * GG_̂β, GG_̂α / GG_̂m, 10000])
 
 GB2_̂α = exp( sln.minimizer[1])
 GB2_̂β = exp( sln.minimizer[2])
@@ -280,16 +282,16 @@ result = [["GB2 \$\\est{\\alpha}\$: ", "GB2 \$\\est{\\beta}\$: ", "GB2 \$\\est{p
 
 \begin{center}
 \begin{tabular}{lr}
-GB2 \(\est{\alpha}\): & 0.9498180950429491\\
-GB2 \(\est{\beta}\): & 1.0983701276884081\,(9)\\
-GB2 \(\est{p}\): & 1.2376067626960379\\
-GB2 \(\est{q}\): & 3.187929333688613\,(6)\\
-GB2 Likelihood: & -6.289560054356965\\
+GB2 \(\est{\alpha}\): & 0.9498191942062975\\
+GB2 \(\est{\beta}\): & 1.016136547549504\,(9)\\
+GB2 \(\est{p}\): & 1.2376044907191777\\
+GB2 \(\est{q}\): & 2.960836571954795\,(6)\\
+GB2 Likelihood: & -6.289560054045967\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
-histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
@@ -303,7 +305,7 @@ savefig( "histPDF_GB2.png" )
 \end{center}
 
 \subsection{e}
-\label{sec:orgce6058a}
+\label{sec:orga9d99a8}
 Since the likelihood function values at the optimum for parts (b) and
 (c) are the constrained maximum likelihood estimators, the likelihood
 ratio test is simply: 
@@ -312,7 +314,7 @@ ratio test is simply:
 \end{equation*}
 
 Where \(p\) is the number of constraints in the estimation procedure. 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 
 # Gamma Has Two restrictions
 tStatGamma = 2*(GB2_LogLikelihood - likelihood)
@@ -331,7 +333,7 @@ Generalized Gamma & -5.796508162347891\,(-9) & 0.0\\
 \end{center}
 
 \subsection{f}
-\label{sec:org4ca58bf}
+\label{sec:org7025d91}
 The Probability that someone has a health care claim of more than
 $\backslash$$1000 is given by:
 
@@ -343,7 +345,7 @@ $\backslash$$1000 is given by:
 However, since the integral of a Generalized Beta 2 Distribution is
 quite nasty, we will compute it numerically.
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 f(x) = GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q )
 area = quadgk( f, 0, 1000 )[1]
 output = ["Probability of Having > 1000: " (1-area)]
@@ -358,10 +360,10 @@ Probability of Having > 1000: & 0.00507829692428996\\
 
 
 \section{Question 2}
-\label{sec:org5329c2c}
+\label{sec:org9cd325b}
 
 \subsection{a}
-\label{sec:org1bab3a3}
+\label{sec:org97ea865}
 
 Equations (3) and (5) tell us that
 
@@ -393,7 +395,7 @@ For $t=1$
 
 We may now estimate this model using Maximum Likelihood Estimation
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 #$\normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)$
 
 #Clean it up when it exists, comes in the order: (c, k, w, r)
@@ -461,7 +463,7 @@ output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\
 \end{center}
 
 \section{b}
-\label{sec:orgc0d4865}
+\label{sec:org9811163}
 
 Taking logs of equation (3):
 \begin{align*}
@@ -513,7 +515,7 @@ For $t = 1$:
 
 This can be estimated using an MLE.
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 r = convert( Vector{Float64}, macroData[:R] )
 k = convert( Vector{Float64}, macroData[:K] )
 
@@ -582,7 +584,7 @@ output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\
 \end{center}
 
 \subsection{c}
-\label{sec:orge56c897}
+\label{sec:org9113740}
 From the derivation of the distribution of $\log r_t$ in part (b):
 
 \begin{align*}
@@ -599,7 +601,7 @@ From the derivation of the distribution of $\log r_t$ in part (b):
       \est{\mu} + (\est{\alpha} - 1) \log( 7,500,000) ))\\
   \end{align*}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
   prob = cdf( Normal(), -sqrt(model_̂σ)*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
 result = ["Prob" prob]
 \end{minted}
