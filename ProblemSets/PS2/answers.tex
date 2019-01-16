@@ -1,4 +1,4 @@
-% Created 2019-01-14 Mon 23:38
+% Created 2019-01-15 Tue 11:04
 % Intended LaTeX compiler: pdflatex
 \documentclass[12pt, letterpaper]{paper}
 \usepackage[utf8]{inputenc}
@@ -14,7 +14,7 @@
 \usepackage{amssymb}
 \usepackage{capt-of}
 \usepackage{hyperref}
-\usepackage{Schwieg}
+\usepackage{fontspec}
 \usepackage{natbib}
 \usepackage{tikz}
 \usepackage{bm}
@@ -30,22 +30,37 @@
  pdftitle={Structural Estimation Pset 2},
  pdfkeywords={},
  pdfsubject={},
- pdfcreator={Emacs 26.1 (Org mode 9.1.9)}, 
+ pdfcreator={Emacs 26.1.50 (Org mode 9.1.9)}, 
  pdflang={English}}
 \begin{document}
 
 \maketitle
 
 \section{Question One}
-\label{sec:org29dab38}
+\label{sec:org9967813}
 \subsection{a}
-\label{sec:orged21076}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-healthClaims = CSV.read( "clms.txt", header=[:A] )
-describe( healthClaims )
+\label{sec:org28ccc09}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+#healthClaims = CSV.read( "clms.txt", header=[:A] )
+healthClaims = DataFrame(load("clms.csv", header_exists=false, colnames=["A"]))
+#describe( healthClaims )
 
-println( "Standard Deviation: ", std(healthClaims[:A]))
+#println( "Standard Deviation: ", std(healthClaims[:A]))
 
+results = [["mean", "min", "median", "max", "StdDev"] [mean(healthClaims[:A]), minimum(healthClaims[:A]), median(healthClaims[:A]), maximum(healthClaims[:A]), std(healthClaims[:A])]]
+\end{minted}
+
+\begin{center}
+\begin{tabular}{lr}
+mean & 720.2779753272437\\
+min & 0.01\\
+median & 172.21\\
+max & 227967.25000000003\\
+StdDev & 3972.8508241194463\\
+\end{tabular}
+\end{center}
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 histogram( healthClaims[:A], bins=1000, normalize = true)
 savefig("histOne.png")
 \end{minted}
@@ -54,11 +69,13 @@ savefig("histOne.png")
 \includegraphics[width=.9\linewidth]{histOne.png}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 truncatedHealthClaims = healthClaims[healthClaims[:A] .<= 800, 1]
 
-
-histogram( truncatedHealthClaims, bins = 100, normalize = true)
+# Doing this will make them sum to one
+#histogram( truncatedHealthClaims, bins = 100, normalize = true)
+#We force all bins to have length 8, and allow for 100 of them.
+histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
 savefig("histTwo.png")
 \end{minted}
 
@@ -69,8 +86,8 @@ savefig("histTwo.png")
 
 
 \subsection{b}
-\label{sec:org1b60f50}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\label{sec:orgec2160f}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 function GammaLogLikelihood( x::Vector{Float64}, α::Float64, β::Float64)
     #Yes I know I could get this using Distributions.jl which could
     #even do the MLE estimate But thats pretty much cheating, and
@@ -146,9 +163,9 @@ Likelihood: & -6.28964508639924\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 
-histogram( truncatedHealthClaims, bins = 100, normalize = true)
+histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims)+5, maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
@@ -163,14 +180,11 @@ savefig("histPDF_Gamma.png")
 \end{center}
 
 \section{c}
-\label{sec:orga90bcb5}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
-#I don't think this is the correct pdf?
+\label{sec:org730c01d}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+# $\text{(GG):}\quad f(x;\alpha,\beta,m) = \frac{m}{\beta^\alpha \Gamma\left(\frac{\alpha}{m}\right)}x^{\alpha-1}e^{-\left(\frac{x}{\beta}\right)^m},\quad x\in[0,\infty), \:\alpha,\beta,m>0$
 function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
     return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
-
-    #return (m * x^(m*β - 1) * exp( - (x / α)^m))/ (α^(m*β) * gamma( β ) )
 end
 
 
@@ -206,15 +220,15 @@ result = [["GG \$\\est{\\alpha}\$: ", "GG \$\\est{\\beta}\$: ", "GG \$\\est{m}\$
 
 \begin{center}
 \begin{tabular}{lr}
-GG \(\est{\alpha}\): & 1.1755020098846642\\
-GG \(\est{\beta}\): & 156.18446475134172\\
-GG \(\est{m}\): & 0.9498167064643459\\
+GG \(\est{\alpha}\): & 1.175501926156338\\
+GG \(\est{\beta}\): & 156.18450458248918\\
+GG \(\est{m}\): & 0.9498168104965249\\
 GG Likelihood: & -6.289560051458711\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-histogram( truncatedHealthClaims, bins = 100, normalize = true)
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
@@ -229,8 +243,8 @@ savefig( "histPDF_GG.png" )
 
 
 \subsection{d}
-\label{sec:orgaf92f24}
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\label{sec:org901e8dc}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 function GBetaTwoPDF( x::Float64, a::Real, b::Real, p::Real, q::Real)
     #We require all parameters to be positive, so abs(a) = a
     return a*x^(a*p -1) / (b^(a*p) *beta(p,q)*(1+(x/b)^a)^(p+q))
@@ -274,8 +288,8 @@ GB2 Likelihood: & -6.289560054356965\\
 \end{tabular}
 \end{center}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-histogram( truncatedHealthClaims, bins = 100, normalize = true)
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+histogram( healthClaims[:A], bins=range(0,8,800), normalize=true, xlims=(0,800))
 pdfXVal = range( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
@@ -289,7 +303,7 @@ savefig( "histPDF_GB2.png" )
 \end{center}
 
 \subsection{e}
-\label{sec:org13cb78f}
+\label{sec:orgce6058a}
 Since the likelihood function values at the optimum for parts (b) and
 (c) are the constrained maximum likelihood estimators, the likelihood
 ratio test is simply: 
@@ -298,7 +312,7 @@ ratio test is simply:
 \end{equation*}
 
 Where \(p\) is the number of constraints in the estimation procedure. 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 
 # Gamma Has Two restrictions
 tStatGamma = 2*(GB2_LogLikelihood - likelihood)
@@ -317,7 +331,7 @@ Generalized Gamma & -5.796508162347891\,(-9) & 0.0\\
 \end{center}
 
 \subsection{f}
-\label{sec:orgb8fa7b1}
+\label{sec:org4ca58bf}
 The Probability that someone has a health care claim of more than
 $\backslash$$1000 is given by:
 
@@ -329,7 +343,7 @@ $\backslash$$1000 is given by:
 However, since the integral of a Generalized Beta 2 Distribution is
 quite nasty, we will compute it numerically.
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
 f(x) = GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q )
 area = quadgk( f, 0, 1000 )[1]
 output = ["Probability of Having > 1000: " (1-area)]
@@ -344,10 +358,10 @@ Probability of Having > 1000: & 0.00507829692428996\\
 
 
 \section{Question 2}
-\label{sec:org3931c06}
+\label{sec:org5329c2c}
 
 \subsection{a}
-\label{sec:org3f70910}
+\label{sec:org1bab3a3}
 
 Equations (3) and (5) tell us that
 
@@ -357,43 +371,33 @@ Equations (3) and (5) tell us that
   z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t
 \end{align*}
 
-
-Note that: $z_0 = \mu$ Therefore:
+Taking logs of equation (3):
 \begin{align*}
-  z_1 &= \mu + \epsilon_1\\
-  z_2 &= \mu + \rho\epsilon_1 + \epsilon_2\\
-  z_t &= \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
+  \log w_t &= \log ( 1- \alpha) + z_t + (\alpha-1) \log k_t\\
+  z_t &= \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t
 \end{align*}
 
-Combining these two together:
+This tells us that for $t > 1$
+\begin{align*}
+  \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
+                                             (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log
+    k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
 
+For $t=1$
 \begin{equation*}
-  w_t - (1-\alpha) exp \left( \mu + \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \right) k_t^{\alpha} = 0
+  \log w_1 - \log ( 1- \alpha) - (\alpha-1) \log k_t \sim \normal( \mu, \sigma^2)
 \end{equation*}
 
-Taking logs and isolating the random component:
-\begin{equation*}
-  \log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}
-\end{equation*}
-
-Note that the sum of iid distributed normal random variables is
-distributed normal, where the variance is given by the sum of the
-variances.
-
-Thus
-\begin{equation*}
-  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i} \sim \normal( 0, \sigma^2 \sum_{i=0}^{t-1} \rho^{2i}) =
-  \normal\left( 0, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
-\end{equation*}
 
 We may now estimate this model using Maximum Likelihood Estimation
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-#$\log w_t - \log(1-\alpha) - \mu - \alpha \log k_t =  \sum_{i=0}^{t-1} \rho^i \epsilon_{t-i}$
-# Variance of error: $\sigma^2 \frac{1 - \rho^{2i}}{1-\rho}$
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+#$\normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)$
 
 #Clean it up when it exists, comes in the order: (c, k, w, r)
-macroData = CSV.read( "MacroSeries.txt", header=[:C,:K,:W,:R])
+macroData = DataFrame(load("MacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R"]))
 
 w = convert( Vector{Float64}, macroData[:W] )
 k = convert( Vector{Float64}, macroData[:K] )
@@ -402,17 +406,16 @@ function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ:
     #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
     #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
 
-    logLik = 0.0
+    logLik = -.5*log(σ²)- ( log(w[1]) - log(1-α) - (1-α)*log(k[1]) - μ)^2 / (2*σ²)
     #Note the way that the model is structured is: F(...) = 0, so we
     #are maximizing the likelihood of getting a 0 returned for all the
     #moments
 
     #Note we do not have the -.5*log(2*pi)
     #Because that does not matter at all for MLE estimation.
-    for i in 1:N
-        mean = log(w[i]) - log( 1 - α) - μ - α*log( k[i])
-        var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
-        logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
+    for i in 2:N
+        mean = ρ*(log(w[i-1]) - log( 1 - α)  - (α-1)*log( k[i-1])) + (1-ρ)*μ
+        logLik += -.5*log( σ² ) - (  (log(w[i]) - log(1-α) - (1-α)*log(k[i]) - mean)^2 / (2*σ²))
     end
     return logLik
 end
@@ -424,98 +427,6 @@ N = length(w)
 μ₀ = 1.0
 σ₀ = 1.0
 ρ₀ = 0.0
-
-#We parameterize each of the variables so that they meet their constraints.
-# tanh is used to ensure that $\rho \in (-1,1)$
-θ = zeros(4)
-θ[1] = log( α₀ / ( 1 - α₀) )
-θ[2] = atanh( ρ₀)
-θ[3] = log( μ₀ )
-θ[4] = log( σ₀)
-
-
-fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
-
-result = optimize(fun, θ, LBFGS(), autodiff=:forward)
-
-model_̂θ = result.minimizer
-
-model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
-model_̂ρ = tanh(model_̂θ[2])
-model_̂μ = exp(model_̂θ[3])
-model_̂σ = exp(model_̂θ[4])
-
-output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
-\end{minted}
-
-\begin{center}
-\begin{tabular}{lr}
-\(\est{\alpha}\): & 0.9999999999985967\\
-\(\est{\rho}\): & 0.0\\
-\(\est{\mu}\): & 27.626774841787046\\
-\(\est{\sigma^{2}}\): & 0.01003725876812115\\
-\end{tabular}
-\end{center}
-
-\section{b}
-\label{sec:org8c33180}
-
-Equations (4) and (5) read:
-\begin{align*}
-  r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
-  z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t\\
-  \epsilon_t \sim \normal( 0, \sigma^2)
-\end{align*}
-
-From part (a) we know that (5) can be recursively solved to yield:
-\begin{equation*}
-  z_t \sim \normal\left( \mu, \sigma^2 \frac{1 - \rho^{2i}}{1-\rho}\right)
-\end{equation*}
-
-Solving for $r_t$ then taking logs in equation (4)
-\begin{align*}
-  \log r_t &= \log \alpha + z_t + (\alpha - 1 ) \log k_t\\
-\end{align*}
-
-This can be written as:
-\begin{equation*}
-  F( r_t, k_t, \alpha, \mu, \sigma, \rho ) = 0
-\end{equation*}
-
-where the variance of the random variable described by $F$ is known,
-and the same as the variance of $z_t$. Thus this system can be
-estimated by MLE.
-
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-r = convert( Vector{Float64}, macroData[:R] )
-k = convert( Vector{Float64}, macroData[:K] )
-
-#$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
-
-function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
-    #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
-    #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
-
-    logLik = 0.0
-    #Note the way that the model is structured is: F(...) = 0, so we
-    #are maximizing the likelihood of getting a 0 returned for all the
-    #moments
-
-    for i in 1:N
-        mean = log(r[i]) - log( α) - μ - (α - 1)*log( k[i])
-        var = σ² * ( 1 - ρ^(2*i)) / ( 1 - ρ)
-        logLik += -.5*log( σ² ) - (  mean*mean / (2*σ²))
-    end
-    return logLik
-end
-
-N = length(w)
-
-α₀ = .5
-β = .99
-μ₀ = 1.0
-σ₀ = 1.0
-ρ₀ = .99
 
 #We parameterize each of the variables so that they meet their constraints.
 # tanh is used to ensure that $\rho \in (-1,1)$
@@ -542,15 +453,136 @@ output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\
 
 \begin{center}
 \begin{tabular}{lr}
-\(\est{\alpha}\): & 0.8887650406380285\\
-\(\est{\rho}\): & 0.99\\
-\(\est{\mu}\): & 1.8877579805483233\\
-\(\est{\sigma^{2}}\): & 0.009515136163054447\\
+\(\est{\alpha}\): & 0.11279736091788892\\
+\(\est{\rho}\): & 0.0013757752571974219\\
+\(\est{\mu}\): & 2.198742765991596\\
+\(\est{\sigma^{2}}\): & 0.00950021304635493\\
+\end{tabular}
+\end{center}
+
+\section{b}
+\label{sec:orgc0d4865}
+
+Taking logs of equation (3):
+\begin{align*}
+  \log w_t &= \log ( 1- \alpha) + z_t + (\alpha-1) \log k_t\\
+  z_t &= \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t
+\end{align*}
+
+This tells us that for $t > 1$
+\begin{align*}
+  \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
+                                             (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log
+    k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
+
+For $t=1$
+\begin{equation*}
+  \log w_1 - \log ( 1- \alpha) - (\alpha-1) \log k_t \sim \normal( \mu, \sigma^2)
+\end{equation*}
+
+
+We may now estimate this model using Maximum Likelihood Estimation
+
+Equations (4) and (5) read:
+\begin{align*}
+  r_t - \alpha \exp( z_t ) k_t^{\alpha -1 } &= 0\\
+  z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t\\
+  \epsilon_t \sim \normal( 0, \sigma^2)
+\end{align*}
+
+Taking logs and isolating $z_t$
+\begin{align*}
+  \log r_t  &= \log \alpha + (\alpha-1) \log k_t + z_t\\
+  z_t &= \log \alpha + (\alpha-1) \log k_t - \log r_t
+\end{align*}
+
+For $t > 1$:
+\begin{align*}
+  \log \alpha + (\alpha-1) \log k_t - \log r_t &\sim \normal\left( \rho z_{t-1} +
+                                       (1-\rho)\mu, \sigma^2 \right)\\
+  &\sim \normal\left( \rho\left( \log \alpha + (\alpha-1)\log k_{t-1} - \log r_{t-1}
+    \right) + (1-\rho)\mu, \sigma^2 \right)
+\end{align*}
+
+For $t = 1$:
+\begin{equation*}
+  \log \alpha + (\alpha-1)\log k_1 - \log r_1 \sim \normal( \mu, \sigma^2)
+\end{equation*}
+
+This can be estimated using an MLE.
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
+r = convert( Vector{Float64}, macroData[:R] )
+k = convert( Vector{Float64}, macroData[:K] )
+
+#$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
+
+function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
+    #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
+    #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
+
+    logLik = -.5*log(σ²) - (log(α) + (α-1)*log(k[1]) - log(r[1]) - μ)^2 / (2*σ² )
+    #Note the way that the model is structured is: F(...) = 0, so we
+    #are maximizing the likelihood of getting a 0 returned for all the
+    #moments
+
+    for i in 2:N
+        mean = ρ*(log(α) + (α-1)*log(k[i-1]) - log(r[i-1])) + (1-ρ)*μ
+        logLik += -.5*log( σ² ) - (  (log(α) + (α-1)*log(k[i]) - log(r[i]) - mean)^2 / (2*σ²))
+    end
+    return logLik
+end
+
+N = length(w)
+
+# α₀ = .5
+# β = .99
+# μ₀ = 1.0
+# σ₀ = 1.0
+# ρ₀ = .99
+  α₀ = .5
+  β = .99
+  μ₀ = 1.0
+  σ₀ = 1.0
+  ρ₀ = 0.0
+
+# #We param
+eterize each of the variables so that they meet their constraints.
+# tanh is used to ensure that $\rho \in (-1,1)$
+θ = zeros(4)
+θ[1] = log( α₀ / ( 1 - α₀) )
+θ[2] = atanh( ρ₀)
+θ[3] = log( μ₀ )
+θ[4] = log( σ₀)
+
+
+fun(x::Vector) = -LogLikelihood( N, w, k, exp(x[1]) / (1 + exp(x[1])), tanh(x[2]), exp(x[3]), exp(x[4])  )
+
+result = optimize(fun, θ, Newton(), autodiff=:forward)
+
+model_̂θ = result.minimizer
+
+model_̂α = exp(model_̂θ[1]) / (1 + exp(model_̂θ[1]))
+model_̂ρ = tanh(model_̂θ[2])
+model_̂μ = exp(model_̂θ[3])
+model_̂σ = exp(model_̂θ[4])
+
+output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  [model_̂α, model_̂ρ, model_̂μ, model_̂σ]]
+\end{minted}
+
+\begin{center}
+\begin{tabular}{lr}
+\(\est{\alpha}\): & 1\\
+\(\est{\rho}\): & 0.26158802254436014\\
+\(\est{\mu}\): & 9793456505444984\,(-30)\\
+\(\est{\sigma^{2}}\): & 0.009480777698471455\\
 \end{tabular}
 \end{center}
 
 \subsection{c}
-\label{sec:org4cb7b57}
+\label{sec:orge56c897}
 From the derivation of the distribution of $\log r_t$ in part (b):
 
 \begin{align*}
@@ -567,14 +599,14 @@ From the derivation of the distribution of $\log r_t$ in part (b):
       \est{\mu} + (\est{\alpha} - 1) \log( 7,500,000) ))\\
   \end{align*}
 
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape]{julia}
   prob = cdf( Normal(), -sqrt(model_̂σ)*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
 result = ["Prob" prob]
 \end{minted}
 
 \begin{center}
 \begin{tabular}{lr}
-Prob & 0.21644022445230773\\
+Prob & 0.39947494113405524\\
 \end{tabular}
 \end{center}
 \end{document}
