@@ -29,6 +29,5 @@ dist/*
 *.ipynb_checkpoints*
 *~
 auto/*
-_minted-temp/*
 auto
-_minted-temp
+_minted-*
