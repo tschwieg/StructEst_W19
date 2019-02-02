@@ -1,4 +1,4 @@
-% Created 2019-01-16 Wed 21:39
+% Created 2019-01-22 Tue 22:34
 % Intended LaTeX compiler: pdflatex
 \documentclass[12pt, letterpaper]{paper}
 \usepackage[utf8]{inputenc}
@@ -37,14 +37,11 @@
 \maketitle
 
 \section{Question One}
-\label{sec:org2ded0c1}
+\label{sec:orgdb13621}
 \subsection{a}
-\label{sec:org83aad7c}
+\label{sec:org3ff56b5}
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-#healthClaims = CSV.read( "clms.txt", header=[:A] )
 healthClaims = DataFrame(load("clms.csv", header_exists=false, colnames=["A"]))
-#describe( healthClaims )
-#println( "Standard Deviation: ", std(healthClaims[:A]))
 
 results = [["mean", "min", "median", "max", "StdDev"] cln.([mean(healthClaims[:A]), minimum(healthClaims[:A]), median(healthClaims[:A]), maximum(healthClaims[:A]), std(healthClaims[:A])] )]
 \end{minted}
@@ -62,6 +59,7 @@ StdDev & 3972.9\\
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 histogram( healthClaims[:A], bins=1000, normalize = true, label="Health Claims")
 savefig("histOne.png")
+
 \end{minted}
 
 \begin{center}
@@ -72,16 +70,23 @@ savefig("histOne.png")
   #We force all bins to have length 8, and allow for 100 of them.
 histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800),label="Health Claims \$\\leq 800\$")
 savefig("histTwo.png")
+
 \end{minted}
 
 \begin{center}
 \includegraphics[width=.9\linewidth]{histTwo.png}
 \end{center}
 
-
+We can see the shape of the distribution for majority of the data
+points lie below \(800\). There is a very large tail that distorts the
+histogram, preventing anything from being seen on the first one. All
+we are able to see is that there is a large amount of mass somewhere
+slightly above zero in the first one. The second distribution shows
+the mode, and indicates the very long tail that the distribution is
+likely to contain.
 
 \subsection{b}
-\label{sec:org1889832}
+\label{sec:org4493d65}
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 function GammaLogLikelihood( x::Vector{Float64}, α::Float64, β::Float64)
     #Yes I know I could get this using Distributions.jl which could
@@ -133,7 +138,7 @@ function EstimateGammaParameters( data::Vector{Float64}, guess::Vector{Float64},
         # println( θ)
         # println( " ")
     end
-    #println( loopCounter)
+    # println( loopCounter)
     return θ
 end
 healthCosts = convert(  Vector{Float64}, healthClaims[:A] )
@@ -146,7 +151,6 @@ healthCosts = convert(  Vector{Float64}, healthClaims[:A] )
 likelihood = GammaLogLikelihood(  healthCosts, Gamma_̂α, Gamma_̂β)
 
 result = [["\$\\est{\\alpha}\$: ", "\$\\est{\\beta}\$: ", "Likelihood: " ] cln.([ Gamma_̂α,  Gamma_̂β, likelihood])]
-
 \end{minted}
 
 \begin{center}
@@ -160,9 +164,8 @@ Likelihood: & -7.3193\\
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800),label="Health Claims \$\\leq 800\$")
 pdfXVal = range( 0.0, 800.0)
-#pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
-pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
 
+pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
 
 plot!( pdfXVal, pdfYVal, label="Gamma Estimate" )
 savefig("histPDF_Gamma.png")
@@ -172,10 +175,13 @@ savefig("histPDF_Gamma.png")
 \includegraphics[width=.9\linewidth]{histPDF_Gamma.png}
 \end{center}
 
+We can see that this fit over-fits the tail of the distribution at the
+cost of the bulk of the mass. It places a relatively high probability
+of being at a very small value, when the distribution appears to have
+a hump.
 \section{c}
-\label{sec:org6ba1c64}
+\label{sec:org7fb1ca9}
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
 # $\text{(GG):}\quad f(x;\alpha,\beta,m) = \frac{m}{\beta^\alpha \Gamma\left(\frac{\alpha}{m}\right)}x^{\alpha-1}e^{-\left(\frac{x}{\beta}\right)^m},\quad x\in[0,\infty), \:\alpha,\beta,m>0$
 function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
     return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
@@ -230,7 +236,6 @@ pdfXVal = range(0.0, 800.0)
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
 
-
 plot!( pdfXVal, pdfYVal, label="Generalized Gamma Estimate" )
 savefig( "histPDF_GG.png" )
 \end{minted}
@@ -239,16 +244,18 @@ savefig( "histPDF_GG.png" )
 \includegraphics[width=.9\linewidth]{histPDF_GG.png}
 \end{center}
 
+This distribution captures the mode of the distribution being greater
+than zero, and while the hump is still occurring too early in order to
+fit the long tail of the distribution; it appears to fit the histogram
+much better than the Gamma Distribution fit.
 
 \subsection{d}
-\label{sec:org83e81e7}
+\label{sec:orgf20253f}
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 function GBetaTwoPDF( x::Float64, a::Real, b::Real, p::Real, q::Real)
     #We require all parameters to be positive, so abs(a) = a
     return a*x^(a*p -1) / (b^(a*p) *beta(p,q)*(1+(x/b)^a)^(p+q))
 end
-
-
 
 function GBetaTwoLikelihood( x::Vector{Float64}, a::Real, b::Real, p::Real, q::Real)
     return log( a) + (a*p -1)*mean(log.(x)) - (a*p)*log(b) - log(beta(p,q)) - (p+q)*mean( log.( 1 .+(x ./ b).^a ))
@@ -295,7 +302,6 @@ pdfXVal = range( 0.0, 800.0)
 #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
 pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
 
-
 plot!( pdfXVal, pdfYVal, label="Generalized Beta 2 Estimate" )
 savefig( "histPDF_GB2.png" )
 \end{minted}
@@ -304,36 +310,53 @@ savefig( "histPDF_GB2.png" )
 \includegraphics[width=.9\linewidth]{histPDF_GB2.png}
 \end{center}
 
+We can see that the Generalized Beta 2 Distribution has fit the
+distribution near \(0\) slightly better than the Generalized Gamma
+Distribution did. It still captures the long tail of the distribution
+relatively well, though the fit is only slightly better than the
+previous one. 
+
 \subsection{e}
-\label{sec:org37d2ff9}
+\label{sec:org65bd701}
 Since the likelihood function values at the optimum for parts (b) and
 (c) are the constrained maximum likelihood estimators, the likelihood
 ratio test is simply: 
 \begin{equation*}
-  2 \left( f( \est{\theta} - \altest{\theta}) \right) \sim \chi_{p}^{2}
+  2 \left( f( \est{\theta}) - f(\altest{\theta}) \right) \sim \chi_{p}^{2}
 \end{equation*}
 
 Where \(p\) is the number of constraints in the estimation procedure. 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
 # Gamma Has Two restrictions
-tStatGamma = 2*(GB2_LogLikelihood - likelihood)
+tStatGamma = 2*N*(GB2_LogLikelihood - likelihood)
 # Generalized Gamma Has One Restriction
-tStatGG = 2*(GB2_LogLikelihood - GG_LogLikelihood)
+tStatGG = 2*N*(GB2_LogLikelihood - GG_LogLikelihood)
 
 results = [["", "Gamma", "Generalized Gamma"] [ "\$\\chi^{2}\$", cln(tStatGamma), cln(tStatGG)] ["p-value",  cln(1.0 - cdf(Chisq(4),tStatGamma)), cln(1.0 - cdf( Chisq(4),tStatGG)) ] ]
 \end{minted}
 
 \begin{center}
-\begin{tabular}{lrr}
+\begin{tabular}{lrl}
  & \(\chi^{2}\) & p-value\\
-Gamma & 0.56771 & 0.96658\\
-Generalized Gamma & 0.078294 & 0.99925\\
+Gamma & 56.771 & 1.382 \texttimes{} 10\(^{\text{-11}}\)\\
+Generalized Gamma & 7.8294 & 0.098033\\
 \end{tabular}
 \end{center}
 
+We find that we can reject the Null Hypothesis that the parameters of
+the Generalized Beta 2 are consistent with the Gamma Distribution at
+pretty much any significance level. We find that the probability that
+this data could be generated by a Gamma Distribution is virtually
+zero.
+
+For the Generalized Gamma Distribution, we find that it is possible
+that these parameters are consistent with the Generalized Gamma
+Distribution. To be willing to reject this hypothesis, we must be
+willing to accept a 10\% chance of being incorrect. Since we are not
+psychologists, we will fail to reject this hypothesis.
+
 \subsection{f}
-\label{sec:org638d3ea}
+\label{sec:orgcb22e3b}
 The Probability that someone has a health care claim of more than
 \$$\backslash$\(1000\) is given by:
 
@@ -343,7 +366,9 @@ The Probability that someone has a health care claim of more than
 \end{align*}
 
 However, since the integral of a Generalized Beta 2 Distribution is
-quite nasty, I shall compute it numerically.
+quite nasty, I shall compute it numerically. We ignore more
+complicated methods of quadrature and brute force rhomboid
+quadrature. 
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 f(x) = GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q )
@@ -357,39 +382,55 @@ Probability of Having > 1000: & 0.11766\\
 \end{tabular}
 \end{center}
 
+We would like to do the same for the Gamma Distribution as well. 
 
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+f(x) = GammaPDF( Gamma_̂α, Gamma_̂β, x )
+area = quadgk(f, 0, 1000)[1]
+output = ["Gamma Probability of Having > 1000: " cln(1-area)]
+\end{minted}
+
+\begin{center}
+\begin{tabular}{lr}
+Gamma Probability of Having > 1000: & 0.23678\\
+\end{tabular}
+\end{center}
+
+We can see that the Gamma Distribution overstates the long tail of the
+distribution, as it is difficult for this distribution to fit a large
+amount of data very far away from the mean.
 
 \section{Question 2}
-\label{sec:org36206b2}
+\label{sec:orge15ef94}
 
 \subsection{a}
-\label{sec:org3a3570a}
+\label{sec:org54fc3fd}
 
 Equations (3) and (5) tell us that
 
 
 \begin{align*}
-  w_t - (1-\alpha) exp( z_t ) (k_t)^{\alpha-1} &= 0\\
+  w_t - (1-\alpha) exp( z_t ) (k_t)^{\alpha} &= 0\\
   z_t = \rho z_{t-1} + (1-\rho)\mu &+ \epsilon_t
 \end{align*}
 
 Taking logs of equation (3):
 \begin{align*}
-  \log w_t &= \log ( 1- \alpha) + z_t + (\alpha-1) \log k_t\\
-  z_t &= \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t
+  \log w_t &= \log ( 1- \alpha) + z_t + \alpha \log k_t\\
+  z_t &= \log w_t - \log ( 1- \alpha) - \alpha \log k_t
 \end{align*}
 
 This tells us that for $t > 1$
 \begin{align*}
-  \log w_t - \log ( 1- \alpha) - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
+  \log w_t - \log ( 1- \alpha) - \alpha \log k_t &\sim \normal\left( \rho z_{t-1} +
                                              (1-\rho)\mu, \sigma^2 \right)\\
-  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log
+  &\sim \normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) - \alpha \log
     k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)
 \end{align*}
 
 For $t=1$
 \begin{equation*}
-  \log w_1 - \log ( 1- \alpha) - (\alpha-1) \log k_1 \sim \normal( \mu, \sigma^2)
+  \log w_1 - \log ( 1- \alpha) - \alpha \log k_1 \sim \normal( \mu, \sigma^2)
 \end{equation*}
 
 
@@ -408,23 +449,24 @@ function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ:
     #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
     #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
 
-    logLik = -.5*log(σ²)- ( log(w[1]) - log(1-α) - (1-α)*log(k[1]) - μ)^2 / (2*σ²)
+    logLik = -.5*log(σ²)- (( log(w[1]) - log(1-α) - (α)*log(k[1]) - μ)^2 / (2*σ²))
 
     #Note we do not have the -.5*log(2*pi)
     #Because that does not matter at all for MLE estimation.
     for i in 2:N
-        mean = ρ*(log(w[i-1]) - log( 1 - α)  - (α-1)*log( k[i-1])) + (1-ρ)*μ
-        logLik += -.5*log( σ² ) - (  (log(w[i]) - log(1-α) - (1-α)*log(k[i]) - mean)^2 / (2*σ²))
+        mean = ρ*(log(w[i-1]) - log( 1 - α)  - (α)*log( k[i-1])) + (1-ρ)*μ
+        logLik += -.5*log( σ² ) - (  (log(w[i]) - log(1-α) - (α)*log(k[i]) - mean)^2 / (2*σ²))
     end
     return logLik
 end
+
 
 N = length(w)
 
 α₀ = .5
 β = .99
-μ₀ = 1.0
-σ₀ = 1.0
+μ₀ = .5
+σ₀ = .5
 ρ₀ = 0.0
 
 #We parameterize each of the variables so that they meet their constraints.
@@ -452,45 +494,58 @@ output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\
 
 \begin{center}
 \begin{tabular}{lr}
-\(\est{\alpha}\): & 0.1128\\
-\(\est{\rho}\): & 0.0013758\\
-\(\est{\mu}\): & 2.1987\\
-\(\est{\sigma^{2}}\): & 0.0095002\\
+\(\est{\alpha}\): & 0.70216\\
+\(\est{\rho}\): & 0.47972\\
+\(\est{\mu}\): & 6.2533\\
+\(\est{\sigma^{2}}\): & 0.0084723\\
 \end{tabular}
 \end{center}
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+
 #Sadly Optim.jl does not automatically report the hessian, though I am
- #sure it is obtainable. So we will use forward-mode automatic
- #differentiation to obtain this hessian. However it does not always
- #return symmetric matrices, so we will make the matrix symmetric then
- #invert it using the cholesky decomposition to be numerically stable.
- hess = ForwardDiff.hessian(fun, result.minimizer)
- for i in 1:4
-     for j in 1:i
-         if i == j
-             continue
-         end
-         hess[i,j] = (hess[i,j]+hess[j,i])*.5
-         hess[j,i] = hess[i,j]
-     end
- end
- F = cholesky(hess)
- #F.L * F.U = H
- hessInv = cln.(F.U \ (F.L \ I))
+#sure it is obtainable. So we will use forward-mode automatic
+#differentiation to obtain this hessian. However it does not always
+#return symmetric matrices, so we will make the matrix symmetric then
+#invert it using the cholesky decomposition to be numerically stable.
+hess = ForwardDiff.hessian(fun, result.minimizer)
+
+F = cholesky(Hermitian(hess))
+F.L * F.U = H
+hessInv = cln.(F.U \ (F.L \ I))
+#This is for version .6 rather than the 1.0 running above.
+#F = chol(Hermitian(hess))
+#hessInv = cln.(F \ (F' \ I))
+result = hessInv
 \end{minted}
 
-\begin{center}
-\begin{tabular}{rlrl}
-0.22705 & 0.00017156 & 0.17324 & -5.1778 \texttimes{} 10\(^{\text{-16}}\)\\
-0.00017156 & 1.2065 \texttimes{} 10\(^{\text{-05}}\) & -2.018 \texttimes{} 10\(^{\text{-05}}\) & 4.6392 \texttimes{} 10\(^{\text{-18}}\)\\
-0.17324 & -2.018 \texttimes{} 10\(^{\text{-05}}\) & 0.13412 & -4.5417 \texttimes{} 10\(^{\text{-16}}\)\\
--5.1778 \texttimes{} 10\(^{\text{-16}}\) & 4.6392 \texttimes{} 10\(^{\text{-18}}\) & -4.5417 \texttimes{} 10\(^{\text{-16}}\) & 0.02\\
-\end{tabular}
-\end{center}
+\begin{equation*}
+  \inv{H} =
+  \begin{pmatrix}
+    1.2234 & -0.38792 & -0.50942 & -2.1141 \times 10^{-12}\\
+-0.38792 & 0.1361 & 0.16153 & 2.6498 \times 10^{-12}\\
+-0.50942 & 0.16153 & 0.21213 & 3.384 \times 10^{-13}\\
+-2.1141 \times 10^{-12} & 2.6498 \times 10^{-12} & 3.384 \times 10^{-13} & 0.02
+  \end{pmatrix}
+\end{equation*}
+
+% \begin{center}
+% \begin{tabular}{rrrl}
+% 1.2234 & -0.38792 & -0.50942 & -2.1141 \texttimes{} 10\(^{\text{-12}}\)\\
+% -0.38792 & 0.1361 & 0.16153 & 2.6498 \texttimes{} 10\(^{\text{-12}}\)\\
+% -0.50942 & 0.16153 & 0.21213 & 3.384 \texttimes{} 10\(^{\text{-13}}\)\\
+% -2.1141 \texttimes{} 10\(^{\text{-12}}\) & 2.6498 \texttimes{} 10\(^{\text{-12}}\) & 3.384 \texttimes{} 10\(^{\text{-13}}\) & 0.02\\
+% \end{tabular}
+% \end{center}
+
+
+We can see that the model believes that there is almost no co-variance
+between the \(\sigma^2\) and the other parameters. There is a high standard
+error for \(\alpha\) and \(\sigma^2\) relative to the magnitude of the point
+estimate. 
 
 \section{b}
-\label{sec:orga026be5}
+\label{sec:orgfb4996d}
 
 Equations (4) and (5) read:
 \begin{align*}
@@ -502,152 +557,157 @@ Equations (4) and (5) read:
 Taking logs and isolating $z_t$
 \begin{align*}
   \log r_t  &= \log \alpha + (\alpha-1) \log k_t + z_t\\
-  z_t &= \log \alpha + (\alpha-1) \log k_t - \log r_t
+  z_t &=  \log r_t - \log \alpha - (\alpha-1) \log k_t
 \end{align*}
 
 For $t > 1$:
 \begin{align*}
-  \log \alpha + (\alpha-1) \log k_t - \log r_t &\sim \normal\left( \rho z_{t-1} +
+  \log r_t - \log \alpha - (\alpha-1) \log k_t &\sim \normal\left( \rho z_{t-1} +
                                        (1-\rho)\mu, \sigma^2 \right)\\
-  &\sim \normal\left( \rho\left( \log \alpha + (\alpha-1)\log k_{t-1} - \log r_{t-1}
+  &\sim \normal\left( \rho\left( \log r_{t-1} - \log \alpha - (\alpha-1)\log k_{t-1}
     \right) + (1-\rho)\mu, \sigma^2 \right)
 \end{align*}
 
 For $t = 1$:
 \begin{equation*}
-  \log \alpha + (\alpha-1)\log k_1 - \log r_1 \sim \normal( \mu, \sigma^2)
+  \log r_1 - \log \alpha - (\alpha-1)\log k_1 \sim \normal( \mu, \sigma^2)
 \end{equation*}
 
 This can be estimated using an MLE.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
 r = convert( Vector{Float64}, macroData[:R] )
 k = convert( Vector{Float64}, macroData[:K] )
 
 #$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
-
-function LogLikelihood( N, w::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
+function LogLikelihood( N, r::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
     #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
     #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
 
-    logLik = -.5*log(σ²) - (log(α) + (α-1)*log(k[1]) - log(r[1]) - μ)^2 / (2*σ² )
-    #Note the way that the model is structured is: F(...) = 0, so we
-    #are maximizing the likelihood of getting a 0 returned for all the
-    #moments
+    logLik = -.5*log(σ²)- (( log(r[1]) - log(α) - (α-1)*log(k[1]) - μ)^2 / (2*σ²))
 
+    #Note we do not have the -.5*log(2*pi)
+    #Because that does not matter at all for MLE estimation.
     for i in 2:N
-        mean = ρ*(log(α) + (α-1)*log(k[i-1]) - log(r[i-1])) + (1-ρ)*μ
-        logLik += -.5*log( σ² ) - (  (log(α) + (α-1)*log(k[i]) - log(r[i]) - mean)^2 / (2*σ²))
+        mean = ρ*(log(r[i-1]) - log( α)  - (α-1)*log( k[i-1])) + (1-ρ)*μ
+        logLik += -.5*log( σ² ) - (  (log(r[i]) - log(α) - (α-1)*log(k[i]) - mean)^2 / (2*σ²))
     end
+
     return logLik
 end
 
-N = length(w)
+N = size(macroData)[1]
 
-# α₀ = .5
-# β = .99
-# μ₀ = 1.0
-# σ₀ = 1.0
-# ρ₀ = .99
-  α₀ = .5
-  β = .99
-  μ₀ = 1.0
-  σ₀ = 1.0
-  ρ₀ = 0.0
+α₀ = .5
+β = .99
+μ₀ = .5
+σ₀ = .5
+ρ₀ = 0.0
 
-# #We param
-eterize each of the variables so that they meet their constraints.
-# tanh is used to ensure that $\rho \in (-1,1)$
+#We parameterize each of the variables so that they meet their
+# constraints.  tanh is used to ensure that $\rho \in (-1,1)$
 θ = zeros(4)
 θ[1] = log( α₀ / ( 1 - α₀) )
 θ[2] = atanh( ρ₀)
 θ[3] = log( μ₀ )
 θ[4] = log( σ₀)
 
+function limitedLogistic( unbounded::Real )
+    return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
+end
+
 #This clamp on the logistic function is quite the hack, since this
 #function shouldn't get to 0 or 1, but it was getting stuck at 1
-fun(x::Vector) = -LogLikelihood( N, w, k, (exp(x[1]) / (1 + exp(x[1])))*.9+.05, tanh(x[2]), exp(x[3]), exp(x[4])  )
+fun(x::Vector) = -LogLikelihood( N, r, k, limitedLogistic(x[1]), tanh(x[2]), exp(x[3]), exp(x[4])  )
 
 result = optimize(fun, θ, Newton(), autodiff=:forward)
 
-model_̂θ = result.minimizer
+bmodel_̂θ = result.minimizer
 
-model_̂α = (exp(model_̂θ[1]) / (1 + exp(model_̂θ[1])))*.9+.05
-model_̂ρ = tanh(model_̂θ[2])
-model_̂μ = exp(model_̂θ[3])
-model_̂σ = exp(model_̂θ[4])
+bmodel_̂α = limitedLogistic(bmodel_̂θ[1])
+bmodel_̂ρ = tanh(bmodel_̂θ[2])
+bmodel_̂μ = exp(bmodel_̂θ[3])
+bmodel_̂σ = exp(bmodel_̂θ[4])
 
-output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  cln.([model_̂α, model_̂ρ, model_̂μ, model_̂σ])]
+output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  cln.([bmodel_̂α, bmodel_̂ρ, bmodel_̂μ, bmodel_̂σ])]
 \end{minted}
 
 \begin{center}
 \begin{tabular}{lr}
-\(\est{\alpha}\): & 0.95\\
-\(\est{\rho}\): & 0.99102\\
-\(\est{\mu}\): & 8.2563 \texttimes{} 10\(^{\text{-15}}\)\\
-\(\est{\sigma^{2}}\): & 0.02061\\
+\(\est{\alpha}\): & 0.70216\\
+\(\est{\rho}\): & 0.47972\\
+\(\est{\mu}\): & 5.0729\\
+\(\est{\sigma^{2}}\): & 0.0084723\\
 \end{tabular}
 \end{center}
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
 #Sadly Optim.jl does not automatically report the hessian, though I am
- #sure it is obtainable. So we will use forward-mode automatic
- #differentiation to obtain this hessian. However it does not always
- #return symmetric matrices, so we will make the matrix symmetric then
- #invert it using the cholesky decomposition to be numerically stable.
- hess = ForwardDiff.hessian(fun, result.minimizer)
- for i in 1:4
-     for j in 1:i
-         if i == j
-             continue
-         end
-         hess[i,j] = (hess[i,j]+hess[j,i])*.5
-         hess[j,i] = hess[i,j]
-     end
- end
- F = cholesky(hess)
- #F.L * F.U = H
- hessInv = cln.(F.U \ (F.L \ I))
+#sure it is obtainable. So we will use forward-mode automatic
+#differentiation to obtain this hessian. However it does not always
+#return symmetric matrices, so we will make the matrix symmetric then
+#invert it using the cholesky decomposition to be numerically stable.
+hess = ForwardDiff.hessian(fun, result.minimizer)
+
+F = cholesky(Hermitian(hess))
+#F.U' * F.U = H
+hessInv = cln.(F.U \ (F.L \ I))
+# F = chol(Hermitian(hess))
+# hessInv = cln.(F \ (F' \ I))
+result = hessInv
 \end{minted}
 
-\begin{center}
-\begin{tabular}{rrrr}
-2.2698 \texttimes{} 10\(^{\text{12}}\) & -0.023973 & 0.0088919 & -0.014286\\
--0.023973 & 0.88359 & 0.031051 & 3.9818 \texttimes{} 10\(^{\text{-16}}\)\\
-0.0088919 & 0.031051 & 3.0942 \texttimes{} 10\(^{\text{12}}\) & 0.02\\
--0.014286 & 3.9818 \texttimes{} 10\(^{\text{-16}}\) & 0.02 & 0.02\\
-\end{tabular}
-\end{center}
+% \begin{center}
+%   \begin{tabular}{rrrl}
+
+\begin{equation*}
+  \inv{H} =
+  \begin{pmatrix}
+    1.2582 & -0.3934 & -0.88139 & -3.7224 \times 10^{-13}\\
+-0.3934 & 0.1361 & 0.27559 & 1.1806 \times 10^{-13}\\
+-0.88139 & 0.27559 & 0.61745 & 2.6018 \times 10^{-13}\\
+-3.7224 \times 10^{-13} & 1.1806 \times 10^{-13} & 2.6018 \times 10^{-13} & 0.02
+  \end{pmatrix}
+\end{equation*}
+
+% \end{tabular}
+% \end{center}
+
+We find nearly the same results for the point estimates, and the
+diagonal elements of the inverse Hessian, modulo some noise. We find
+that the off-diagonal elements are less consistent between the two
+estimates, though these co-variances are quite small relative to the
+measurements. To really tell the difference between the point
+estimates, we would have to compare the overlap of the confidence
+sets. 
 
 \subsection{c}
-\label{sec:orga31d249}
+\label{sec:org83a11f9}
 From the derivation of the distribution of $\log r_t$ in part (b):
 
 \begin{align*}
     \Pr( r_t > 1) &= \Pr( \log r_t > 0)\\
                   &= \Pr( \log \alpha + z_t + (\alpha - 1)\log k_t > 0)\\
                   &= \Pr( \log \alpha + \rho z_{t-1} + (1 - \rho)\mu + \epsilon_t + (\alpha-1) \log k_t > 0)\\
-    &= \Pr( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + \frac{Z}{\sigma} + (\alpha-1) \log k_t
+    &= \Pr( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + \sigma Z + (\alpha-1) \log k_t
       > 0)\\
-                  &= \Pr( Z > - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t))\\
+                  &= \Pr( Z > - \frac{1}{\sigma} ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t))\\
     &= 1 - \Pr( Z \leq - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log
       k_t))\\
-                  &= \Phi( - \sigma ( \log(\alpha) + \rho z_{t-1} + (1-\rho)\mu + (\alpha-1)\log k_t ))\\
-    &\approx \Phi( -\est{\sigma} ( \log \est{\alpha} + \est{\rho}10 + (1-\est{\rho})
+    &\approx 1 - \Pr( Z \leq  -\frac{1}{\est{\sigma}} ( \log \est{\alpha} + \est{\rho}10 + (1-\est{\rho})
       \est{\mu} + (\est{\alpha} - 1) \log( 7,500,000) ))\\
-  \end{align*}
+\end{align*}
+
+Where $Z \sim \normal(0,1)$
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  prob = cdf( Normal(), -sqrt(model_̂σ)*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
-result = ["Prob" cln(prob)]
-
+prob = 1 - cdf( Normal(), -(1.0 / sqrt(model_̂σ))*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
+result = ["\\Pr( r_t > 1) = " cln(prob)]
 \end{minted}
 
 \begin{center}
 \begin{tabular}{lr}
-Prob & 0.2541\\
+\(\Pr\)( r\(_{\text{t}}\) > 1) = & 1\\
 \end{tabular}
 \end{center}
 \end{document}

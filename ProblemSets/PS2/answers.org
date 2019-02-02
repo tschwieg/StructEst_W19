@@ -28,7 +28,6 @@
       return replace(@sprintf("%.5g",x), r"e[\+]?([\-0123456789]+)" => s" \\times 10^{\1}")  
   end
   pyplot()
-
 #+END_SRC
 
 
@@ -38,34 +37,44 @@
 
 ** a
 #+BEGIN_SRC julia 
-  #healthClaims = CSV.read( "clms.txt", header=[:A] )
   healthClaims = DataFrame(load("clms.csv", header_exists=false, colnames=["A"]))
-  #describe( healthClaims )
-  #println( "Standard Deviation: ", std(healthClaims[:A]))
 
   results = [["mean", "min", "median", "max", "StdDev"] cln.([mean(healthClaims[:A]), minimum(healthClaims[:A]), median(healthClaims[:A]), maximum(healthClaims[:A]), std(healthClaims[:A])] )]
 #+END_SRC
 
-#+RESULTS[b439abd2d2705aabdc480d8ca8b10397c85f56de]:
+#+RESULTS[3c8d21c5398289aa458c1b4224c7ac1e0878705b]:
+| mean   |        720.28 |
+| min    |          0.01 |
+| median |        172.21 |
+| max    | 2.2797 \times 10^{05} |
+| StdDev |        3972.9 |
 
 #+BEGIN_SRC julia :results graphics  :file histOne.png
   histogram( healthClaims[:A], bins=1000, normalize = true, label="Health Claims")
   savefig("histOne.png")
+
 #+END_SRC
 
-#+RESULTS[3dd520f05a48a965777c0a514ee944095490b689]:
+#+RESULTS[5cd73fb1a3357c6f1baa1c9eaddf68b818d35ed6]:
 [[file:histOne.png]]
 
 #+BEGIN_SRC julia :results graphics :file histTwo.png
     #We force all bins to have length 8, and allow for 100 of them.
   histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800),label="Health Claims \$\\leq 800\$")
   savefig("histTwo.png")
+
 #+END_SRC
 
-#+RESULTS[35907771fbff13aa1b781daf33722e9a6f69c7c7]:
+#+RESULTS[a63af54fafda29d26d3941379b5d0f17e307a795]:
 [[file:histTwo.png]]
 
-
+We can see the shape of the distribution for majority of the data
+points lie below $800$. There is a very large tail that distorts the
+histogram, preventing anything from being seen on the first one. All
+we are able to see is that there is a large amount of mass somewhere
+slightly above zero in the first one. The second distribution shows
+the mode, and indicates the very long tail that the distribution is
+likely to contain.
 
 ** b
 #+BEGIN_SRC julia :results value
@@ -132,10 +141,9 @@
   likelihood = GammaLogLikelihood(  healthCosts, Gamma_̂α, Gamma_̂β)
 
   result = [["\$\\est{\\alpha}\$: ", "\$\\est{\\beta}\$: ", "Likelihood: " ] cln.([ Gamma_̂α,  Gamma_̂β, likelihood])]
-
 #+END_SRC
 
-#+RESULTS[6c660a370b3759bd06ca0f0b56c6b75fec983e07]:
+#+RESULTS[b34d8e5661bd00feb82dee91963e2dba9af8755a]:
 | $\est{\alpha}$:  | 0.47251 |
 | $\est{\beta}$:  |  1524.4 |
 | Likelihood: | -7.3193 |
@@ -143,20 +151,22 @@
 #+BEGIN_SRC julia  :results value graphics :file histPDF_Gamma.png
   histogram( healthClaims[:A], bins=0:8:800, normalize=true, xlims=(0,800),label="Health Claims \$\\leq 800\$")
   pdfXVal = range( 0.0, 800.0)
-  #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
-  pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
 
+  pdfYVal = [GammaPDF( Gamma_̂α, Gamma_̂β, x ) for x in pdfXVal]
 
   plot!( pdfXVal, pdfYVal, label="Gamma Estimate" )
   savefig("histPDF_Gamma.png")
 #+END_SRC
 
-#+RESULTS[45a8afb698dd527cfd5bd2ac0bb663293628f410]:
+#+RESULTS[43f36b73c740b516b18316310042c08dfc08c639]:
 [[file:histPDF_Gamma.png]]
 
+We can see that this fit over-fits the tail of the distribution at the
+cost of the bulk of the mass. It places a relatively high probability
+of being at a very small value, when the distribution appears to have
+a hump.
 * c
 #+BEGIN_SRC julia
-
   # $\text{(GG):}\quad f(x;\alpha,\beta,m) = \frac{m}{\beta^\alpha \Gamma\left(\frac{\alpha}{m}\right)}x^{\alpha-1}e^{-\left(\frac{x}{\beta}\right)^m},\quad x\in[0,\infty), \:\alpha,\beta,m>0$
   function GGammaPDF( α::Float64, β::Float64, m::Float64, x::Float64)
       return ( (m / β^α) * x^(α-1) * exp( - (x / β)^m) ) / gamma( α / m)
@@ -196,7 +206,7 @@
 
 #+END_SRC
 
-#+RESULTS[68d572a70054f768f35536d78cb8299e9536101e]:
+#+RESULTS[23c3087658f89af68305e91fb170b5c527bbe018]:
 | GG $\est{\alpha}$:  |  1.7396 |
 | GG $\est{\beta}$:  |     0.1 |
 | GG $\est{m}$:  | 0.24872 |
@@ -208,14 +218,17 @@
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GGammaPDF( GG_̂α, GG_̂β, GG_̂m, x ) for x in pdfXVal]
 
-
   plot!( pdfXVal, pdfYVal, label="Generalized Gamma Estimate" )
   savefig( "histPDF_GG.png" )
 #+END_SRC
 
-#+RESULTS[969c034363739c887914bee4c3e23d419049d91f]:
+#+RESULTS[e0a6a543522286526486bc7adad579b3d91ab253]:
 [[file:histPDF_GG.png]]
 
+This distribution captures the mode of the distribution being greater
+than zero, and while the hump is still occurring too early in order to
+fit the long tail of the distribution; it appears to fit the histogram
+much better than the Gamma Distribution fit.
 
 ** d 
 #+BEGIN_SRC julia
@@ -223,8 +236,6 @@
       #We require all parameters to be positive, so abs(a) = a
       return a*x^(a*p -1) / (b^(a*p) *beta(p,q)*(1+(x/b)^a)^(p+q))
   end
-
-
 
   function GBetaTwoLikelihood( x::Vector{Float64}, a::Real, b::Real, p::Real, q::Real)
       return log( a) + (a*p -1)*mean(log.(x)) - (a*p)*log(b) - log(beta(p,q)) - (p+q)*mean( log.( 1 .+(x ./ b).^a ))
@@ -255,7 +266,7 @@
   result = [["GB2 \$\\est{\\alpha}\$: ", "GB2 \$\\est{\\beta}\$: ", "GB2 \$\\est{p}\$: ","GB2 \$\\est{q}\$: ","GB2 Likelihood: " ] cln.([GB2_̂α, GB2_̂β,  GB2_̂p,  GB2_̂q, -sln.minimum])]
 #+END_SRC
 
-#+RESULTS[44eb59590167354a526d56902f97c55b67e8a88a]:
+#+RESULTS[24db8dc71a3abe4f630ac42fb4162ed4655b7259]:
 | GB2 $\est{\alpha}$:  |  1.2714 |
 | GB2 $\est{\beta}$:  |  143.23 |
 | GB2 $\est{p}$:  |  1.0299 |
@@ -268,13 +279,18 @@
   #pdfXVal = linspace( minimum(truncatedHealthClaims), maximum(truncatedHealthClaims))
   pdfYVal = [GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q ) for x in pdfXVal]
 
-
   plot!( pdfXVal, pdfYVal, label="Generalized Beta 2 Estimate" )
   savefig( "histPDF_GB2.png" )
 #+END_SRC
 
-#+RESULTS[52ff72ae16d713cd7bf9ffee3b7a4e9ae5fbcae5]:
+#+RESULTS[c366c62ed0ca85f3108e9b4c43e65af62bad2c06]:
 [[file:histPDF_GB2.png]]
+
+We can see that the Generalized Beta 2 Distribution has fit the
+distribution near $0$ slightly better than the Generalized Gamma
+Distribution did. It still captures the long tail of the distribution
+relatively well, though the fit is only slightly better than the
+previous one. 
 
 ** e
 Since the likelihood function values at the optimum for parts (b) and
@@ -288,19 +304,30 @@ ratio test is simply:
 
 Where $p$ is the number of constraints in the estimation procedure. 
 #+BEGIN_SRC julia
-
   # Gamma Has Two restrictions
-  tStatGamma = 2*(GB2_LogLikelihood - likelihood)
+  tStatGamma = 2*N*(GB2_LogLikelihood - likelihood)
   # Generalized Gamma Has One Restriction
-  tStatGG = 2*(GB2_LogLikelihood - GG_LogLikelihood)
+  tStatGG = 2*N*(GB2_LogLikelihood - GG_LogLikelihood)
 
   results = [["", "Gamma", "Generalized Gamma"] [ "\$\\chi^{2}\$", cln(tStatGamma), cln(tStatGG)] ["p-value",  cln(1.0 - cdf(Chisq(4),tStatGamma)), cln(1.0 - cdf( Chisq(4),tStatGG)) ] ]
 #+END_SRC
 
-#+RESULTS[4de0ebb3e97eca034d27dbd6c93c794dcc7fd10e]:
-|                   |     $\chi^{2}$ | p-value |
-| Gamma             |  0.56771 | 0.96658 |
-| Generalized Gamma | 0.078294 | 0.99925 |
+#+RESULTS[0def48658dca9bab495b6db470e01f97356ef3f4]:
+|                   |   $\chi^{2}$ | p-value       |
+| Gamma             | 56.771 | 1.382 \times 10^{-11} |
+| Generalized Gamma | 7.8294 | 0.098033      |
+
+We find that we can reject the Null Hypothesis that the parameters of
+the Generalized Beta 2 are consistent with the Gamma Distribution at
+pretty much any significance level. We find that the probability that
+this data could be generated by a Gamma Distribution is virtually
+zero.
+
+For the Generalized Gamma Distribution, we find that it is possible
+that these parameters are consistent with the Generalized Gamma
+Distribution. To be willing to reject this hypothesis, we must be
+willing to accept a 10% chance of being incorrect. Since we are not
+psychologists, we will fail to reject this hypothesis.
 
 ** f
 The Probability that someone has a health care claim of more than
@@ -314,7 +341,9 @@ $\$1000$ is given by:
 #+END_EXPORT
 
 However, since the integral of a Generalized Beta 2 Distribution is
-quite nasty, I shall compute it numerically.
+quite nasty, I shall compute it numerically. We ignore more
+complicated methods of quadrature and brute force rhomboid
+quadrature. 
 
 #+BEGIN_SRC julia
   f(x) = GBetaTwoPDF( x, GB2_̂α, GB2_̂β, GB2_̂p, GB2_̂q )
@@ -322,7 +351,7 @@ quite nasty, I shall compute it numerically.
   output = ["Probability of Having > 1000: " cln(1-area)]
 #+END_SRC
 
-#+RESULTS[864af5f419ffa876e7615f9835856d30b55e3953]:
+#+RESULTS[19c65cd2ca7ae2c794436766df5718f2e515298e]:
 | Probability of Having > 1000: | 0.11766 |
 
 We would like to do the same for the Gamma Distribution as well. 
@@ -335,6 +364,10 @@ We would like to do the same for the Gamma Distribution as well.
 
 #+RESULTS[1c03fc7ec8605eea4ac4c0bb0a01662ffe6f095b]:
 | Gamma Probability of Having > 1000: | 0.23678 |
+
+We can see that the Gamma Distribution overstates the long tail of the
+distribution, as it is difficult for this distribution to fit a large
+amount of data very far away from the mean.
 
 * Question 2
 
@@ -373,7 +406,6 @@ We may now estimate this model using Maximum Likelihood Estimation
   #+END_EXPORT
 
 #+BEGIN_SRC julia
-
   #$\normal\left( \rho\left( \log w_{t-1} - \log( 1- \alpha) -(\alpha-1) \log k_{t-1} \right) + (1-\rho)\mu, \sigma^2 \right)$
 
   #Clean it up when it exists, comes in the order: (c, k, w, r)
@@ -427,31 +459,43 @@ We may now estimate this model using Maximum Likelihood Estimation
   model_̂σ = exp(model_̂θ[4])
 
   output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  cln.([model_̂α, model_̂ρ, model_̂μ, model_̂σ])]
-
 #+END_SRC
 
-#+RESULTS[773ec4a600d8906c06dcdf4fb31bc3f778a59e0f]:
+#+RESULTS[910900d3b381c4b815b367f99b44ab39080edcee]:
+| $\est{\alpha}$:  |   0.70216 |
+| $\est{\rho}$:  |   0.47972 |
+| $\est{\mu}$:  |    6.2533 |
+| $\est{\sigma^{2}}$: | 0.0084723 |
 
 #+BEGIN_SRC julia
- #Sadly Optim.jl does not automatically report the hessian, though I am
+
+  #Sadly Optim.jl does not automatically report the hessian, though I am
   #sure it is obtainable. So we will use forward-mode automatic
   #differentiation to obtain this hessian. However it does not always
   #return symmetric matrices, so we will make the matrix symmetric then
   #invert it using the cholesky decomposition to be numerically stable.
   hess = ForwardDiff.hessian(fun, result.minimizer)
 
-  #F = cholesky(Hermitian(hess))
-  #F.L * F.U = H
-  #hessInv = cln.(F.U \ (F.L \ I))
-  F = chol(Hermitian(hess))
-  hessInv = cln.(F \ (F' \ I))
+  F = cholesky(Hermitian(hess))
+  F.L * F.U = H
+  hessInv = cln.(F.U \ (F.L \ I))
+  #This is for version .6 rather than the 1.0 running above.
+  #F = chol(Hermitian(hess))
+  #hessInv = cln.(F \ (F' \ I))
+  result = hessInv
 #+END_SRC
 
-#+RESULTS[ddccbce31395b172ddff2f08d3da877555c42175]:
-|        1.2234 |        -0.38792 |        -0.50942 | 1.224 \times 10^{-15}   |
-|      -0.38792 |          0.1361 |         0.16153 | -3.7929 \times 10^{-16} |
-|      -0.50942 |         0.16153 |         0.21213 | -5.1563 \times 10^{-16} |
-| 1.224 \times 10^{-15} | -3.7929 \times 10^{-16} | -5.1563 \times 10^{-16} | 0.02            |
+#+RESULTS[bb74bc16410c852a545ecfd2dac756a3b9c1071d]:
+|          1.2234 |       -0.38792 |      -0.50942 | -2.1141 \times 10^{-12} |
+|        -0.38792 |         0.1361 |       0.16153 | 2.6498 \times 10^{-12}  |
+|        -0.50942 |        0.16153 |       0.21213 | 3.384 \times 10^{-13}   |
+| -2.1141 \times 10^{-12} | 2.6498 \times 10^{-12} | 3.384 \times 10^{-13} | 0.02            |
+
+
+We can see that the model believes that there is almost no co-variance
+between the $\sigma^2$ and the other parameters. There is a high standard
+error for $\alpha$ and $\sigma^2$ relative to the magnitude of the point
+estimate. 
 
 * b
 
@@ -490,7 +534,6 @@ This can be estimated using an MLE.
   k = convert( Vector{Float64}, macroData[:K] )
 
   #$\log r_t - \log \alpha - z_t - (\alpha - 1 ) \log k_t = 0$
-
   function LogLikelihood( N, r::Vector{Float64}, k::Vector{Float64}, α::Real, ρ::Real, μ::Real, σ²::Real  )
       #The pdf of a normal: $\frac{1}{\sqrt{2 \pi \sigma^2}} \exp( - \frac{ (x-\mu)^2}{2 \sigma^2})$
       #Log Likelihood: $- \frac{1}{2} \log \sigma^2 - \frac{ (x-\mu)^2}{ 2 \sigma^2}$
@@ -515,11 +558,6 @@ This can be estimated using an MLE.
   σ₀ = .5
   ρ₀ = 0.0
 
-  # α₀ =  model_̂α
-  # ρ₀ =  model_̂ρ
-  # μ₀ =  model_̂μ
-  # σ₀ =  model_̂σ
-
   #We parameterize each of the variables so that they meet their
   # constraints.  tanh is used to ensure that $\rho \in (-1,1)$
   θ = zeros(4)
@@ -532,51 +570,57 @@ This can be estimated using an MLE.
       return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
   end
 
-
   #This clamp on the logistic function is quite the hack, since this
   #function shouldn't get to 0 or 1, but it was getting stuck at 1
   fun(x::Vector) = -LogLikelihood( N, r, k, limitedLogistic(x[1]), tanh(x[2]), exp(x[3]), exp(x[4])  )
 
   result = optimize(fun, θ, Newton(), autodiff=:forward)
 
-  model_̂θ = result.minimizer
+  bmodel_̂θ = result.minimizer
 
-  model_̂α = limitedLogistic(model_̂θ[1])
-  model_̂ρ = tanh(model_̂θ[2])
-  model_̂μ = exp(model_̂θ[3])
-  model_̂σ = exp(model_̂θ[4])
+  bmodel_̂α = limitedLogistic(bmodel_̂θ[1])
+  bmodel_̂ρ = tanh(bmodel_̂θ[2])
+  bmodel_̂μ = exp(bmodel_̂θ[3])
+  bmodel_̂σ = exp(bmodel_̂θ[4])
 
-  output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  cln.([model_̂α, model_̂ρ, model_̂μ, model_̂σ])]
+  output = [["\$\\est{\\alpha}\$:", "\$\\est{\\rho}\$:", "\$\\est{\\mu}\$:", "\$\\est{\\sigma^{2}}\$:"]  cln.([bmodel_̂α, bmodel_̂ρ, bmodel_̂μ, bmodel_̂σ])]
 #+END_SRC
 
-#+RESULTS[1dc15af295ee00d24cfe862abbe3c3cd2988555f]:
+#+RESULTS[d29ad7318a05120ef9596fdefbada5888bbf35e6]:
 | $\est{\alpha}$:  |   0.70216 |
 | $\est{\rho}$:  |   0.47972 |
 | $\est{\mu}$:  |    5.0729 |
 | $\est{\sigma^{2}}$: | 0.0084723 |
 
 #+BEGIN_SRC julia
-
   #Sadly Optim.jl does not automatically report the hessian, though I am
-   #sure it is obtainable. So we will use forward-mode automatic
-   #differentiation to obtain this hessian. However it does not always
-   #return symmetric matrices, so we will make the matrix symmetric then
-   #invert it using the cholesky decomposition to be numerically stable.
-   hess = ForwardDiff.hessian(fun, result.minimizer)
+  #sure it is obtainable. So we will use forward-mode automatic
+  #differentiation to obtain this hessian. However it does not always
+  #return symmetric matrices, so we will make the matrix symmetric then
+  #invert it using the cholesky decomposition to be numerically stable.
+  hess = ForwardDiff.hessian(fun, result.minimizer)
 
-
-   #F = cholesky(Hermitian(hess))
-   #F.L * F.U = H
-   #hessInv = cln.(F.U \ (F.L \ I))
-   F = chol(Hermitian(hess))
-   hessInv = cln.(F \ (F' \ I))
+  F = cholesky(Hermitian(hess))
+  #F.U' * F.U = H
+  hessInv = cln.(F.U \ (F.L \ I))
+  # F = chol(Hermitian(hess))
+  # hessInv = cln.(F \ (F' \ I))
+  result = hessInv
 #+END_SRC
 
-#+RESULTS[0c3d4bfd42a9ac8fb5286573b5fb80aaa6b5386d]:
-|         1.2582 |        -0.3934 |       -0.88139 | -3.681 \times 10^{-13} |
-|        -0.3934 |         0.1361 |        0.27559 | 1.1678 \times 10^{-13} |
-|       -0.88139 |        0.27559 |        0.61745 | 2.5728 \times 10^{-13} |
-| -3.681 \times 10^{-13} | 1.1678 \times 10^{-13} | 2.5728 \times 10^{-13} | 0.02           |
+#+RESULTS[83cca6f9dcfb9a4353cb716d8db72d303123073a]:
+|          1.2582 |        -0.3934 |       -0.88139 | -3.7224 \times 10^{-13} |
+|         -0.3934 |         0.1361 |        0.27559 | 1.1806 \times 10^{-13}  |
+|        -0.88139 |        0.27559 |        0.61745 | 2.6018 \times 10^{-13}  |
+| -3.7224 \times 10^{-13} | 1.1806 \times 10^{-13} | 2.6018 \times 10^{-13} | 0.02            |
+
+We find nearly the same results for the point estimates, and the
+diagonal elements of the inverse Hessian, modulo some noise. We find
+that the off-diagonal elements are less consistent between the two
+estimates, though these co-variances are quite small relative to the
+measurements. To really tell the difference between the point
+estimates, we would have to compare the overlap of the confidence
+sets. 
 
 ** c
 #+BEGIN_EXPORT latex
@@ -600,8 +644,8 @@ Where $Z \sim \normal(0,1)$
 
 #+BEGIN_SRC julia
   prob = 1 - cdf( Normal(), -(1.0 / sqrt(model_̂σ))*( log(model_̂α) + model_̂ρ*10 + (1-model_̂ρ)*model_̂μ + (model_̂α-1)*log( 7500000)))
-  result = ["Prob" cln(prob)]
+  result = ["\\Pr( r_t > 1) = " cln(prob)]
 #+END_SRC
 
-#+RESULTS[05454c91be322f8bd34a483f9ff3971672b8e9be]:
-| Prob | 1 |
+#+RESULTS[39cd3d84f1c12250d5f56257713f3756cdb05a88]:
+| $\Pr( r_t > 1): = $ | 1 |
