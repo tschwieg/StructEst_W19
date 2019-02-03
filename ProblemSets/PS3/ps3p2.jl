@@ -48,7 +48,7 @@ function limitedLogistic( unbounded::Real )
 end
 
 function invertLogistic( x::Real )
-    return log( (1.0-200*x)/ (200.0*x - 199.0))
+    return log( (1.0-200.0*x)/ (200.0*x - 199.0))
 end
 
 θ = [alphaStart, betaStart, rhoStart, muStart]
