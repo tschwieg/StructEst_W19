@@ -37,12 +37,6 @@ r = convert( Vector{Float64}, macroData[:R] )
 
 mom = Vector{Real}(undef,4)
 
-#Initialize this guy with the stuff we got the first time around
-alphaStart = invertLogistic(.70216)
-rhoStart = atanh(.47972)
-muStart = log(5.0729)
-betaStart = invertLogistic(.99)
-
 function limitedLogistic( unbounded::Real )
     return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
 end
@@ -50,6 +44,14 @@ end
 function invertLogistic( x::Real )
     return log( (1.0-200.0*x)/ (200.0*x - 199.0))
 end
+
+#Initialize this guy with the stuff we got the first time around
+alphaStart = invertLogistic(.70216)
+rhoStart = atanh(.47972)
+muStart = log(5.0729)
+betaStart = invertLogistic(.99)
+
+
 
 θ = [alphaStart, betaStart, rhoStart, muStart]
 
@@ -62,5 +64,7 @@ betaHat = limitedLogistic( result.minimizer[2])
 rhoHat = tanh( result.minimizer[3])
 muHat = exp( result.minimizer[4])
 
+output = latexify([["\$\\est{\\alpha}\$", "\$\\est{\\beta}\$", "\$\\est{\\rho}\$", "\$\\est{\\mu}\$"] [alphaHat, betaHat, rhoHat, muHat]])
 
+latexify([alphaHat, betaHat, rhoHat, muHat]')
 
