@@ -64,5 +64,7 @@ alphaHat = limitedLogistic( result.minimizer[1])
 rhoHat = tanh( result.minimizer[2])
 muHat = exp( result.minimizer[3])
 
+output = latexify([["\$\\est{\\alpha}\$", "\$\\est{\\beta}\$", "\$\\est{\\rho}\$", "\$\\est{\\mu}\$"] [alphaHat, betaHat, rhoHat, muHat]])
 
+latexify([alphaHat, betaHat, rhoHat, muHat]')
 

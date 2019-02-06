@@ -19,7 +19,12 @@ for i in 1:length(incomes[:midpoint])
     bins[i+1] = bins[i] + ((incomes[:midpoint][i]) - bins[i])*2
 end
 
-plot( bins, heights, bins = bins, seriestype=:barbins)
+plotBins = copy(bins)
+plotBins ./= 1000.0
+
+plot( plotBins, heights, bins = bins, seriestype=:barbins, xlabel="Thousands of Dollars", label="US Incomes", ylabel="density")
+
+savefig("histogram.pdf")
 
 #We're gonna simulate some stuff and match moments for our initial
 #guess
@@ -98,7 +103,8 @@ estHeightsLoggyBoy = GenerateMoments( container, cdfBins, LogNormal, [mu, sigma]
 estHeightsLoggyBoy[41] /= 10.0
 estHeightsLoggyBoy[42] /= 20.0
 
-plot!(incomes[:midpoint], estHeightsLoggyBoy, label="LogNormal GMM Estimate")
+plot!(incomes[:midpoint] / 1000.0, estHeightsLoggyBoy, label="LogNormal GMM Estimate")
+savefig("loggyboy.pdf")
 
 gamContainer = copy(container)
 θ = [3.0, 25000.0]
@@ -112,7 +118,8 @@ estHeightsGammaMan = GenerateMoments( gamContainer, cdfBins, Gamma, [gamAlpha, g
 estHeightsGammaMan[41] /= 10.0
 estHeightsGammaMan[42] /= 20.0
 
-plot!(incomes[:midpoint], estHeightsGammaMan, label="Gamma GMM Estimate")
+plot!(incomes[:midpoint] / 1000.0, estHeightsGammaMan, label="Gamma GMM Estimate")
+savefig("gammaMan.pdf" )
 
 #Compare the fit using the GMM weight function
 gamResult.minimum
@@ -161,7 +168,7 @@ for s in 1:S
 end
 
 
-F = cholesky(sum( simMoments[s,:]*simMoments[s,:]' for s in 1:S ))
+F = cholesky(mean( simMoments[s,:]*simMoments[s,:]' for s in 1:S ))
 #F.L * F.U
 wHat = F.U \ (F.L \ I)
 
@@ -177,6 +184,8 @@ estHeightsTwoStage = GenerateMoments( twoStageContainer, cdfBins, Gamma, [twoSta
 estHeightsTwoStage[41] /= 10.0
 estHeightsTwoStage[42] /= 20.0
 
-plot!(incomes[:midpoint], estHeightsTwoStage, label="Two-Stage Gamma GMM Estimate")
+plot!(incomes[:midpoint] / 1000.0, estHeightsTwoStage, label="Two-Stage Gamma GMM Estimate")
+savefig("twoStageLad.pdf")
+
 
 sum(abs(x - y) for (x,y) in zip( estHeightsTwoStage, dataStuff)) / 2

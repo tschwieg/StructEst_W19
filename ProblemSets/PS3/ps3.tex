@@ -102,10 +102,7 @@
 To begin with, the data are loaded in.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-
 incomes = DataFrame( CSV.File( "data/usincmoms.csv", delim='\t',header=[:percent,:midpoint] ) )
-
-  
 \end{minted}
 
 
@@ -127,10 +124,18 @@ for i in 1:length(incomes[:midpoint])
     bins[i+1] = bins[i] + ((incomes[:midpoint][i]) - bins[i])*2
 end
 
-plot( bins, heights, bins = bins, seriestype=:barbins)
+plotBins = copy(bins)
+plotBins ./= 1000.0
+
+plot( plotBins, heights, bins = bins, seriestype=:barbins, xlabel="Thousands of Dollars", label="US Incomes", ylabel="density")
+
+savefig("histogram.pdf")
 \end{minted}
 
-%Insert the picture here
+% Insert the picture here
+\begin{centering}
+  \includegraphics{histogram.pdf}
+\end{centering}
 
 We can see that there is a tail to this distribution, though not
 nearly as long as in the health distribution.
@@ -167,7 +172,6 @@ end
 
 W = convert( Matrix{Float64}, Diagonal(convert(Vector{Float64}, incomes[:percent])) )
 
-
 function GMMCrit( W::Matrix{Float64}, dataMoments::Vector{Float64},
                   container::Vector{Float64}, bins::Vector{Float64},
                   distributions, params::Vector)
@@ -188,7 +192,7 @@ simulated data. These estimators take the form of:
 
 This is implemented below:
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  dataProbs = cumsum( incomes[:percent])
+dataProbs = cumsum( incomes[:percent])
 dataProbs[length(dataProbs)] = 1.0
 N = 100000
 M = length(dataProbs)
@@ -225,6 +229,26 @@ logResult = optimize( fun, θ, BFGS())
 
 The results from the optimization are printed below:
 
+\begin{verbatim}
+Results of Optimization Algorithm
+ * Algorithm: BFGS
+ * Starting Point: [10.818767925970231,0.7701372401373785]
+ * Minimizer: [10.862298881282367,1.022995942443407]
+ * Minimum: 3.522920e-05
+ * Iterations: 7
+ * Convergence: true
+   * |x - x'| ≤ 0.0e+00: false 
+     |x - x'| = 1.54e-05 
+   * |f(x) - f(x')| ≤ 0.0e+00 |f(x)|: false
+     |f(x) - f(x')| = 1.07e-08 |f(x)|
+   * |g(x)| ≤ 1.0e-08: true 
+     |g(x)| = 3.07e-11 
+   * Stopped by an increasing objective: false
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 27
+ * Gradient Calls: 27
+\end{verbatim}
+
 We now overlay the histogram of $\mu,\sigma$ on the bar chart used to display
 the data from part (a).
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
@@ -238,6 +262,10 @@ estHeightsLoggyBoy[42] /= 20.0
 plot!(incomes[:midpoint], estHeightsLoggyBoy, label="LogNormal GMM Estimate")
 \end{minted}
 
+\begin{centering}
+  \includegraphics{loggyboy.pdf}
+\end{centering}
+
 \subsection{(c)}
 
 For the Gamma Distribution, we are given initial values to choose, and
@@ -245,7 +273,7 @@ can implement our estimation using the same function as before, with
 simply changing the distribution that is passed.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  gamContainer = copy(container)
+gamContainer = copy(container)
 θ = [3.0, 25000.0]
 betaFun(x::Vector) = GMMCrit( W, dataStuff, gamContainer, cdfBins, Gamma, x  )
 gamResult = optimize( betaFun, θ, BFGS())
@@ -253,28 +281,63 @@ gamResult = optimize( betaFun, θ, BFGS())
 
 The results for our optimization algorithm are printed below:
 
+\begin{verbatim}
+Results of Optimization Algorithm
+ * Algorithm: BFGS
+ * Starting Point: [3.0,25000.0]
+ * Minimizer: [1.3984481398133792,46486.004874968334]
+ * Minimum: 1.094699e-05
+ * Iterations: 13
+ * Convergence: true
+   * |x - x'| ≤ 0.0e+00: false 
+     |x - x'| = 6.37e+00 
+   * |f(x) - f(x')| ≤ 0.0e+00 |f(x)|: false
+     |f(x) - f(x')| = 7.44e-06 |f(x)|
+   * |g(x)| ≤ 1.0e-08: true 
+     |g(x)| = 1.91e-09 
+   * Stopped by an increasing objective: false
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 52
+ * Gradient Calls: 52
+\end{verbatim}
+
 The histogram is plotted in the same way as before as well:
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  estHeightsGammaMan = GenerateMoments( gamContainer, cdfBins, Gamma, [gamAlpha, gamBeta] )
+estHeightsGammaMan = GenerateMoments( gamContainer, cdfBins, Gamma, [gamAlpha, gamBeta] )
 estHeightsGammaMan[41] /= 10.0
 estHeightsGammaMan[42] /= 20.0
 
-plot!(incomes[:midpoint], estHeightsGammaMan, label="Gamma GMM Estimate")
+plot!(incomes[:midpoint] / 1000.0, estHeightsGammaMan, label="Gamma GMM Estimate")
 \end{minted}
+
+\begin{centering}
+  \includegraphics{gammaMan.pdf}
+\end{centering}
 
 \subsection{(d)}
 
 The overlaid plots are shown below:
 
 % I WANT PHOTOS OF SPIDER MAN NOW
+\begin{centering}
+  \includegraphics{allTogetherNow.pdf}
+\end{centering}
+
 
 The question of the most precise way to tell which distribution fits
 the data the best is subjective. To define ``best'' we need to define
 a norm. The norm that these moments are minimized on is the sample
 frequency, and based upon this norm, which distribution fits the data
 best is simply which has a smaller minimum. By this norm we find that
-XXX is the better fit.
+the Gamma Distribution is the better fit.
+
+\vspace{.25in}
+\begin{tabular}{ll}
+  Gamma Minimum & $1.09470 \times 10^{-5}$\\
+  LogNormal Minimum & $3.52292 \times 10^{-5}$\\
+\end{tabular}
+\vspace{.25in}
 
 However, this is not a common norm used when describing the distance
 between two distributions. More common notions of distance are the
@@ -289,7 +352,19 @@ sum(abs(x - y) for (x,y) in zip( estHeightsGammaMan, dataStuff)) / 2
 sum(abs(x - y) for (x,y) in zip( estHeightsLoggyBoy, dataStuff)) / 2
 \end{minted}
 
-Under this norm, we find that YYY fits the data better.
+
+
+\begin{tabular}{ll}
+  Gamma Norm & $0.048159$\\
+  LogNormal Norm & $0.071237$
+\end{tabular}
+
+\vspace{.25in}
+
+Under this norm, we find that the Gamma fits the data better as
+well. These are both in line with the visual test, which appears to
+show the gamma distribution fitting the data better.
+
 
 \subsection{(e)}
 
@@ -307,8 +382,76 @@ distribution of the truth. Therefore we can construct a two-step
 weighting matrix from this simulated data.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  #Whatis this for again?
+S = 100
+simulation = Vector{Vector{Float64}}(undef,S)
+simMoments = Matrix{Float64}(undef, S, 42)
+simMoments .= 0
+for s in 1:S
+    simulation[s] = rand(Gamma( gamAlpha, gamBeta), N)
+    for i in 1:N
+        for j in 1:42
+            if( simulation[s][i] >= bins[j] && simulation[s][i] < bins[j+1]  )
+                simMoments[s,j] += 1
+            end
+        end
+    end
+end
+
+simMoments ./= N
+
+#Theres a problem with this simulating over the upper bound of the
+#bins, so we just make it sum to one
+for s in 1:S
+    simMoments[s,42] = 1.0 - sum(simMoments[s,1:41])
+    #simMoments[s,:] = estHeightsGammaMan - simMoments[s,:]
+end
+
+simErrors = Matrix{Float64}(undef, S, 42)
+for s in 1:S
+    simErrors[s,:] = estHeightsGammaMan - simMoments[s,:]
+end
+
+
+F = cholesky(sum( simMoments[s,:]*simMoments[s,:]' for s in 1:S ))
+wHat = F.U \ (F.L \ I)
 \end{minted}
+
+Estimation of the Gamma distribution then follows as before:
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+twoStageContainer = copy(container)
+θ = [gamAlpha, gamBeta]
+gamFun(x::Vector) = GMMCrit( wHat, dataStuff, twoStageContainer, cdfBins, Gamma, x  )
+gamResult = optimize( gamFun, θ, NelderMead())
+
+twoStageAlpha = gamResult.minimizer[1]
+twoStageBeta = gamResult.minimizer[2]
+\end{minted}
+
+\begin{verbatim}
+Results of Optimization Algorithm
+ * Algorithm: Nelder-Mead
+ * Starting Point: [1.3984481398133792,46486.004874968334]
+ * Minimizer: [1.3142290928311697,51131.041222344385]
+ * Minimum: 3.309378e+01
+ * Iterations: 40
+ * Convergence: true
+   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-08: true
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 82
+\end{verbatim}
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+estHeightsTwoStage = GenerateMoments( twoStageContainer, cdfBins, Gamma, [twoStageAlpha, twoStageBeta] )
+estHeightsTwoStage[41] /= 10.0
+estHeightsTwoStage[42] /= 20.0
+
+plot!(incomes[:midpoint] / 1000.0, estHeightsTwoStage, label="Two-Stage Gamma GMM Estimate")
+\end{minted}
+
+\begin{centering}
+  \includegraphics{twoStageLad.pdf}
+\end{centering}
 
 We find that our estimates for $\alpha,\beta$ do not change by a large
 amount. However comparing the goodness-of-fit between the two
@@ -319,12 +462,12 @@ well. Therefore we will return to the Total-Variation Norm to compute
 the goodness of fit measure.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  sum(abs(x - y) for (x,y) in zip( estHeightsTwoStage, dataStuff)) / 2.0
+sum(abs(x - y) for (x,y) in zip( estHeightsTwoStage, dataStuff)) / 2.0
 \end{minted}
 
 We find that the total variation norm for the two-stage estimator to
-be: ZZZ. This is strange because it actually fits the data worse than
-the single stage estimator does.
+be: $0.056597$. This indicates that it fits the data less well than
+the original Gamma distribution estimate. 
 
 
 \section{Question 2}
@@ -349,7 +492,7 @@ For our initial guess, we will use the estimates that we reached
 during Problem Set 2.
 
 \begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-  macroData = DataFrame(load("data/MacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R"]))
+macroData = DataFrame(load("data/MacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R"]))
 
 function ConstructMoments( moments::Vector{Real}, α::Real, β::Real, ρ::Real,
                            μ::Real, c::Vector{Float64},k::Vector{Float64},
@@ -371,6 +514,14 @@ function ConstructMoments( moments::Vector{Real}, α::Real, β::Real, ρ::Real,
     return sum(moments[i]*moments[i] for i in 1:4)
 end
 
+function limitedLogistic( unbounded::Real )
+    return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
+end
+
+function invertLogistic( x::Real )
+    return log( (1.0-200.0*x)/ (200.0*x - 199.0))
+end
+
 W = convert(Matrix{Real}, Diagonal([1.0,1.0,1.0,1.0]))
 
 c = convert( Vector{Float64}, macroData[:C] )
@@ -386,14 +537,6 @@ rhoStart = atanh(.47972)
 muStart = log(5.0729)
 betaStart = invertLogistic(.99)
 
-function limitedLogistic( unbounded::Real )
-    return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
-end
-
-function invertLogistic( x::Real )
-    return log( (1.0-200.0*x)/ (200.0*x - 199.0))
-end
-
 θ = [alphaStart, betaStart, rhoStart, muStart]
 
 f(x::Vector) = ConstructMoments( mom, limitedLogistic(x[1]), limitedLogistic(x[2]), tanh(x[3]), exp(x[4]), c, k, w, r, W )
@@ -406,18 +549,34 @@ rhoHat = tanh( result.minimizer[3])
 muHat = exp( result.minimizer[4])
 \end{minted}
 
-The results of this estimation are summarized below in the table:
+Output from the optimization algorithm is given below:
+
+\begin{verbatim}
+Results of Optimization Algorithm
+ * Algorithm: Nelder-Mead
+ * Starting Point: [0.8673885548750386,5.2832037287379885, ...]
+ * Minimizer: [0.8717159418980703,5.283203728737997, ...]
+ * Minimum: 5.248191e-19
+ * Iterations: 223
+ * Convergence: true
+   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-18: true
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 419
+\end{verbatim}
+
+However these minimizers are points in $\setR^4$, so they must be
+translated back into the parameter space. The output from this is
+given below.
 
 \begin{center}
   \begin{tabular}{rr}
-    Criterion: & 638y67486\\
-\(\est{\alpha}\): & 0.70216\\
-\(\est{\rho}\): & 0.47972\\
-\(\est{\mu}\): & 5.0729\\
-\(\est{\sigma^{2}}\): & 0.0084723\\
+    Criterion: & 5.248191e-19\\
+\(\est{\alpha}\): & 0.70305\\
+\(\est{\beta}\): & 0.99000\\
+\(\est{\rho}\): & 0.47873\\
+\(\est{\mu}\): & 5.05862\\
 \end{tabular}
 \end{center}
-
 
 
 \end{document}
