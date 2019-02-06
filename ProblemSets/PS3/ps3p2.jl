@@ -8,14 +8,15 @@ pyplot()
 
 macroData = DataFrame(load("data/MacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R"]))
 
-function ConstructMoments( moments::Vector{Real}, α::Real, β::Real, ρ::Real,
-                           μ::Real, c::Vector{Float64},k::Vector{Float64},
-                           w::Vector{Float64}, r::Vector{Float64}, W::Matrix{Real})
+function ConstructMoments( moments::Vector{Real}, α::Real, ρ::Real,
+                           μ::Real, β::Float64, c::Vector{Float64},
+                           k::Vector{Float64}, w::Vector{Float64},
+                           r::Vector{Float64}, W::Matrix{Real})
     # $r_t - \alpha \exp ( z_t ) k_t^{\alpha - 1} = 0$
     # $\log r_t = \log \alpha + z_t + (\alpha - 1) \log k_t$
     # $z_t = \log r_t - \log \alpha - (\alpha - 1) \log k_t$
     N = 100
-    z = Vector{Real}(undef, N)
+    z = Vector{Real}(N)
     for i in 1:N
         z[i] = log( r[i]) - log(α) - (α - 1.0)*log( k[i] )
     end
@@ -35,13 +36,7 @@ w = convert( Vector{Float64}, macroData[:W] )
 k = convert( Vector{Float64}, macroData[:K] )
 r = convert( Vector{Float64}, macroData[:R] )
 
-mom = Vector{Real}(undef,4)
-
-#Initialize this guy with the stuff we got the first time around
-alphaStart = invertLogistic(.70216)
-rhoStart = atanh(.47972)
-muStart = log(5.0729)
-betaStart = invertLogistic(.99)
+mom = Vector{Real}(4)
 
 function limitedLogistic( unbounded::Real )
     return ((exp(unbounded)) / ( 1 + exp(unbounded)))*.99 + .005
@@ -51,16 +46,23 @@ function invertLogistic( x::Real )
     return log( (1.0-200.0*x)/ (200.0*x - 199.0))
 end
 
-θ = [alphaStart, betaStart, rhoStart, muStart]
 
-f(x::Vector) = ConstructMoments( mom, limitedLogistic(x[1]), limitedLogistic(x[2]), tanh(x[3]), exp(x[4]), c, k, w, r, W )
+#Initialize this guy with the stuff we got the first time around
+alphaStart = invertLogistic(.70216)
+rhoStart = atanh(.47972)
+muStart = log(5.0729)
+betaStart = invertLogistic(.99)
 
-result = optimize( f, θ, NelderMead(), autodiff = :forward, Optim.Options( g_tol = 1e-18))
+
+θ = [alphaStart, rhoStart, muStart]
+
+f(x::Vector) = ConstructMoments( mom, limitedLogistic(x[1]), tanh(x[2]), exp(x[3]), .99, c, k, w, r, W )
+
+result = optimize( f, θ, Newton(), autodiff = :forward)
 
 alphaHat = limitedLogistic( result.minimizer[1])
-betaHat = limitedLogistic( result.minimizer[2])
-rhoHat = tanh( result.minimizer[3])
-muHat = exp( result.minimizer[4])
+rhoHat = tanh( result.minimizer[2])
+muHat = exp( result.minimizer[3])
 
 
 
