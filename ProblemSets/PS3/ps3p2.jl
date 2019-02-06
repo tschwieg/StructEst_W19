@@ -51,7 +51,6 @@ end
 alphaStart = invertLogistic(.70216)
 rhoStart = atanh(.47972)
 muStart = log(5.0729)
-betaStart = invertLogistic(.99)
 
 
 θ = [alphaStart, rhoStart, muStart]

@@ -26,25 +26,25 @@ plot( plotBins, heights, bins = bins, seriestype=:barbins, xlabel="Thousands of 
 
 savefig("histogram.pdf")
 
-#We're gonna simulate some stuff and match moments for our initial
-#guess
-dataProbs = cumsum( incomes[:percent])
-dataProbs[length(dataProbs)] = 1.0
-N = 100000
-M = length(dataProbs)
-simulation = rand( Uniform(), N)
-for i in 1:N
-    for j in 1:M
-        #if( dataProbs[j] >= simulation[i])
-        if( simulation[i] < dataProbs[j])
-            simulation[i] = incomes[:midpoint][j]
-            break
-        end
-    end
-end
+# #We're gonna simulate some stuff and match moments for our initial
+# #guess
+# dataProbs = cumsum( incomes[:percent])
+# dataProbs[length(dataProbs)] = 1.0
+# N = 100000
+# M = length(dataProbs)
+# simulation = rand( Uniform(), N)
+# for i in 1:N
+#     for j in 1:M
+#         #if( dataProbs[j] >= simulation[i])
+#         if( simulation[i] < dataProbs[j])
+#             simulation[i] = incomes[:midpoint][j]
+#             break
+#         end
+#     end
+# end
 
-simMean = mean(simulation)
-simVar = var(simulation)
+simMean = mean(incomes[:percent].*incomes[:midpoint])
+simVar = mean(incomes[:percent.*(incomes[:midpoint].^2)]) - simMean^2#var(simulation)
 #From the lognormal we know that
 
 #simMean = exp( mu + sig / 2)

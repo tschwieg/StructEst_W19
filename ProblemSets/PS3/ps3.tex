@@ -365,111 +365,6 @@ Under this norm, we find that the Gamma fits the data better as
 well. These are both in line with the visual test, which appears to
 show the gamma distribution fitting the data better.
 
-
-\subsection{(e)}
-
-There is a lot of issues surrounding the construction of this two-step
-weighting matrix. Ideally, with full access to this data, we would
-like to construct it using the outer-product of the errors where only
-a single measurement is supplied to each moment, and summing over all
-the data. However, we are not given the entire data, and merely the
-histogram contents.
-
-Construction of such a two-step matrix will then have to be done via
-simulation. If we believe that are our estimates are actually the
-truth, then data simulated from these estimates should come from the
-distribution of the truth. Therefore we can construct a two-step
-weighting matrix from this simulated data.
-
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-S = 100
-simulation = Vector{Vector{Float64}}(undef,S)
-simMoments = Matrix{Float64}(undef, S, 42)
-simMoments .= 0
-for s in 1:S
-    simulation[s] = rand(Gamma( gamAlpha, gamBeta), N)
-    for i in 1:N
-        for j in 1:42
-            if( simulation[s][i] >= bins[j] && simulation[s][i] < bins[j+1]  )
-                simMoments[s,j] += 1
-            end
-        end
-    end
-end
-
-simMoments ./= N
-
-#Theres a problem with this simulating over the upper bound of the
-#bins, so we just make it sum to one
-for s in 1:S
-    simMoments[s,42] = 1.0 - sum(simMoments[s,1:41])
-    #simMoments[s,:] = estHeightsGammaMan - simMoments[s,:]
-end
-
-simErrors = Matrix{Float64}(undef, S, 42)
-for s in 1:S
-    simErrors[s,:] = estHeightsGammaMan - simMoments[s,:]
-end
-
-
-F = cholesky(sum( simMoments[s,:]*simMoments[s,:]' for s in 1:S ))
-wHat = F.U \ (F.L \ I)
-\end{minted}
-
-Estimation of the Gamma distribution then follows as before:
-
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-twoStageContainer = copy(container)
-θ = [gamAlpha, gamBeta]
-gamFun(x::Vector) = GMMCrit( wHat, dataStuff, twoStageContainer, cdfBins, Gamma, x  )
-gamResult = optimize( gamFun, θ, NelderMead())
-
-twoStageAlpha = gamResult.minimizer[1]
-twoStageBeta = gamResult.minimizer[2]
-\end{minted}
-
-\begin{verbatim}
-Results of Optimization Algorithm
- * Algorithm: Nelder-Mead
- * Starting Point: [1.3984481398133792,46486.004874968334]
- * Minimizer: [1.3142290928311697,51131.041222344385]
- * Minimum: 3.309378e+01
- * Iterations: 40
- * Convergence: true
-   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-08: true
-   * Reached Maximum Number of Iterations: false
- * Objective Calls: 82
-\end{verbatim}
-
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-estHeightsTwoStage = GenerateMoments( twoStageContainer, cdfBins, Gamma, [twoStageAlpha, twoStageBeta] )
-estHeightsTwoStage[41] /= 10.0
-estHeightsTwoStage[42] /= 20.0
-
-plot!(incomes[:midpoint] / 1000.0, estHeightsTwoStage, label="Two-Stage Gamma GMM Estimate")
-\end{minted}
-
-\begin{centering}
-  \includegraphics{twoStageLad.pdf}
-\end{centering}
-
-We find that our estimates for $\alpha,\beta$ do not change by a large
-amount. However comparing the goodness-of-fit between the two
-distributions can no longer be done by comparing the minimums between
-the two distributions. Since the weighting matrix has been changed,
-the implied norm that we are minimizing with respect to has changed as
-well. Therefore we will return to the Total-Variation Norm to compute
-the goodness of fit measure.
-
-\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
-sum(abs(x - y) for (x,y) in zip( estHeightsTwoStage, dataStuff)) / 2.0
-\end{minted}
-
-We find that the total variation norm for the two-stage estimator to
-be: $0.056597$. This indicates that it fits the data less well than
-the original Gamma distribution estimate. 
-
-
 \section{Question 2}
 
 The empirical analogs to our estimates are obtained by the
@@ -535,33 +430,39 @@ mom = Vector{Real}(undef,4)
 alphaStart = invertLogistic(.70216)
 rhoStart = atanh(.47972)
 muStart = log(5.0729)
-betaStart = invertLogistic(.99)
 
-θ = [alphaStart, betaStart, rhoStart, muStart]
+θ = [alphaStart, rhoStart, muStart]
 
-f(x::Vector) = ConstructMoments( mom, limitedLogistic(x[1]), limitedLogistic(x[2]), tanh(x[3]), exp(x[4]), c, k, w, r, W )
+f(x::Vector) = ConstructMoments( mom, limitedLogistic(x[1]), tanh(x[2]), exp(x[3]), .99, c, k, w, r, W )
 
-result = optimize( f, θ, NelderMead(), autodiff = :forward, Optim.Options( g_tol = 1e-18))
+result = optimize( f, θ, Newton(), autodiff = :forward)
 
 alphaHat = limitedLogistic( result.minimizer[1])
-betaHat = limitedLogistic( result.minimizer[2])
-rhoHat = tanh( result.minimizer[3])
-muHat = exp( result.minimizer[4])
+rhoHat = tanh( result.minimizer[2])
+muHat = exp( result.minimizer[3])
 \end{minted}
 
 Output from the optimization algorithm is given below:
 
 \begin{verbatim}
 Results of Optimization Algorithm
- * Algorithm: Nelder-Mead
- * Starting Point: [0.8673885548750386,5.2832037287379885, ...]
- * Minimizer: [0.8717159418980703,5.283203728737997, ...]
- * Minimum: 5.248191e-19
- * Iterations: 223
+ * Algorithm: Newton's Method
+ * Starting Point: [0.8673885548750386,0.5226205157374497, ...]
+ * Minimizer: [0.8713799716017797,0.5214436286856307, ...]
+ * Minimum: 3.467430e-19
+ * Iterations: 9
  * Convergence: true
-   *  √(Σ(yᵢ-ȳ)²)/n < 1.0e-18: true
+   * |x - x'| ≤ 0.0e+00: false 
+     |x - x'| = 1.05e-05 
+   * |f(x) - f(x')| ≤ 0.0e+00 |f(x)|: false
+     |f(x) - f(x')| = 7.09e+03 |f(x)|
+   * |g(x)| ≤ 1.0e-08: true 
+     |g(x)| = 1.33e-11 
+   * Stopped by an increasing objective: false
    * Reached Maximum Number of Iterations: false
- * Objective Calls: 419
+ * Objective Calls: 27
+ * Gradient Calls: 27
+ * Hessian Calls: 9
 \end{verbatim}
 
 However these minimizers are points in $\setR^4$, so they must be
@@ -570,11 +471,10 @@ given below.
 
 \begin{center}
   \begin{tabular}{rr}
-    Criterion: & 5.248191e-19\\
-\(\est{\alpha}\): & 0.70305\\
-\(\est{\beta}\): & 0.99000\\
-\(\est{\rho}\): & 0.47873\\
-\(\est{\mu}\): & 5.05862\\
+    Criterion: & $3.467 \times 10^{-19}$\\
+\(\est{\alpha}\): & 0.70298\\
+\(\est{\rho}\): & 0.47881\\
+\(\est{\mu}\): & 5.05981\\
 \end{tabular}
 \end{center}
 
