@@ -1,0 +1,116 @@
+results = optimize(f, θ, Newton(), autodiff=:forward)
+Results of Optimization Algorithm
+ * Algorithm: Newton's Method
+ * Starting Point: [4.8077582340735585,-0.877412372562471, ...]
+ * Minimizer: [-0.19288333200456412,0.32513578293163214, ...]
+ * Minimum: 4.331495e-06
+ * Iterations: 69
+ * Convergence: true
+   * |x - x'| ≤ 0.0e+00: false 
+     |x - x'| = 2.27e-07 
+   * |f(x) - f(x')| ≤ 0.0e+00 |f(x)|: false
+     |f(x) - f(x')| = 1.56e-10 |f(x)|
+   * |g(x)| ≤ 1.0e-08: true 
+     |g(x)| = 6.33e-13 
+   * Stopped by an increasing objective: false
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 227
+ * Gradient Calls: 227
+ * Hessian Calls: 69
+
+answer = [LogitTransform(x[1],5.0, 14.0),
++          LogitTransform(x[2], .01, .99),
++          LogitTransform(x[3], -.99, .99),
++          LogitTransform(x[4], 0.01, 1.1)]
+4-element Array{Float64,1}:
+ 9.932646978878989  
+ 0.42103613802768947
+ 0.9193643618762394 
+ 0.08951209454130482
+
+mom = m(answer)
+6-element Array{Real,1}:
+  0.0007300913579818042 
+ -0.0007376556190434634 
+ -0.0017558655381804127 
+ -9.688593198418377e-9  
+  0.00029393694814873174
+  -0.00029131201720979767
+
+varMat = (1/S)*inv( J' * W*J)
+4×4 Array{Float64,2}:
+  0.0257529    -0.00151738   0.000250977   3.65533e-5
+ -0.00151738    9.02329e-5  -2.74531e-5    1.36322e-6
+  0.000250977  -2.74531e-5   0.00232626   -0.00097449
+  3.65533e-5    1.36322e-6  -0.00097449    0.00041461
+
+julia> stdErrors = [sqrt(varMat[i,i]) for i in 1:4]
+4-element Array{Float64,1}:
+ 0.1604770701111893  
+ 0.009499100361935424
+ 0.048231362793496046
+ 0.020361964338113037
+  
+
+wHat = convert( Matrix{Real},inv((1/S)*sum( E[:,i]*E[:,i]' for i in 1:S)))
+6×6 Array{Real,2}:
+    1.34386e16    -1.3593e16    1.12984e16    -7.39115  -75.1883      213.64     
+   -1.3593e16      1.37492e16  -1.14282e16    -4.0        0.0          -0.0      
+    1.12984e16    -1.14282e16   9.49896e15    66.3249     2.92331e5    -2.93297e5
+  -11.5272        -2.61035     64.7022         6.55609  156.546      -254.312    
+  905.516       -825.01         2.84224e5    156.546      8.4976e5     -8.51365e5
+ -711.646        808.575       -2.85161e5   -254.312     -8.51365e5     8.55922e5
+
+resultsOpt = optimize(fOpt, x, Newton(), autodiff=:forward)
+Results of Optimization Algorithm
+ * Algorithm: Newton's Method
+ * Starting Point: [-0.19288333200456412,0.32513578293163214, ...]
+ * Minimizer: [-0.19275858830581438,0.3251357829316348, ...]
+ * Minimum: 9.999802e-01
+ * Iterations: 8
+ * Convergence: true
+   * |x - x'| ≤ 0.0e+00: true 
+     |x - x'| = 0.00e+00 
+   * |f(x) - f(x')| ≤ 0.0e+00 |f(x)|: true
+     |f(x) - f(x')| = 0.00e+00 |f(x)|
+   * |g(x)| ≤ 1.0e-08: false 
+     |g(x)| = 2.93e+01 
+   * Stopped by an increasing objective: false
+   * Reached Maximum Number of Iterations: false
+ * Objective Calls: 175
+ * Gradient Calls: 175
+ * Hessian Calls: 8
+
+
+answerOpt = [LogitTransform(xOpt[1],5.0, 14.0),
++          LogitTransform(xOpt[2], .01, .99),
++          LogitTransform(xOpt[3], -.99, .99),
++          LogitTransform(xOpt[4], 0.01, 1.1)]
+4-element Array{Float64,1}:
+ 9.932646978878989  
+ 0.42103613802768947
+ 0.9193643618762394 
+ 0.08951209454130482
+
+momOpt = mOpt(answerOpt)
+6-element Array{Real,1}:
+  0.0007300913579818042 
+ -0.0007376556190434634 
+ -0.0017558655381804127 
+ -9.688593198418377e-9  
+  0.00029393694814873174
+ -0.00029131201720979767
+
+julia> varMatOpt = (1/S)*inv( JOpt' * wHat*JOpt )
+4×4 Array{Float64,2}:
+  9.31902e-6   -8.64973e-20  -9.14716e-7   -1.77834e-7
+ -8.68942e-20   2.45955e-21  -1.56133e-20   4.4825e-21
+ -8.25163e-7   -1.58937e-20   3.33612e-6   -4.34326e-7
+  4.91427e-8    2.99765e-21  -4.27854e-7    2.87901e-7
+
+julia> stdErrorsOpt = [sqrt(varMatOpt[i,i]) for i in 1:4]
+4-element Array{Float64,1}:
+ 0.003052707245892253  
+ 4.9593863300683934e-11
+ 0.0018265043575507948 
+ 0.0005365640009272416 
