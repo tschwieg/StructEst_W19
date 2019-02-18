@@ -1,4 +1,224 @@
+\documentclass[12pt]{paper}
+
+\usepackage[T1]{fontenc}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{bbm}
+\usepackage{graphicx}
+\usepackage{minted}
+
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+%\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{bm}
+\usepackage{minted}
+
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{bbm}
+\usepackage{graphicx}
+
+\usepackage{fontspec}
+\setmonofont{Ubuntu Mono}
+
+
+\DeclareMathOperator{\diam}{diam}
+\newcommand{\Mod}[1]{\ \mathrm{mod}\ #1}
+%\DeclareMathOperator{\mod}{mod}
+\DeclareMathOperator{\interior}{int}
+\DeclareMathOperator{\close}{cl}
+
+\newcommand{\met}[1]{d \left ( #1 \right )}
+\newcommand{\brak}[1]{ \left [ #1 \right ] }
+\newcommand{\cbrak}[1]{ \left \{ #1 \right \}}
+\renewcommand{\vec}[1]{ \bm{ #1 }}
+\newcommand{\abs}[1]{\left \lvert #1 \right \rvert}
+\newcommand{\seq}[1]{{\left \{ #1 \right \}}}
+\newcommand{\conj}[1]{ \overline{ #1 } }
+%\newcommand{\close}[1]{ \bar{ #1 } }
+\newcommand{\set}[1]{\left \{ #1 \right \}}
+\newcommand{\Lim}{\lim\limits}
+\newcommand{\compose}{\circ}
+\newcommand{\inv}[1]{{#1}^{-1}}
+\newcommand{\compl}[1]{{#1}^{c}}
+
+
+
+\newcommand{\setR}{ \mathbb{R} }
+\newcommand{\setQ}{ \mathbb{Q} }
+\newcommand{\setZ}{ \mathbb{Z} }
+\newcommand{\setN}{ \mathbb{N} }
+
+\newcommand{\plim}{ \overset{p}{\to} }
+\newcommand{\mean}[2][N]{ \overline{ #2 }_{#1}}
+\newcommand{\exV}[1]{\mathbb{E} \left [ #1 \right ]}
+\newcommand{\Vari}[1]{\mathbb{V} \left ( #1 \right )}
+
+\newcommand{\est}[2][n]{ \widehat{ #2 }_{#1}}
+\newcommand{\altest}[2][n]{ \tilde{ #2 }_{#1}}
+
+\newcommand{\indicate}[1]{ \mathbbm{1}_{\{#1\}}}
+\newcommand{\convDist}{ \overset{d}{\to}}
+\newcommand{\unif}{\emph{U}}
+\newcommand{\normal}{\mathcal{N}}
+\newcommand{\eye}{\mathbbm{I}}
+
+\newcommand{\bigO}{\mathcal{O}}
+\newcommand{\Lagrange}{\mathcal{L}}
+
+\newcommand{\deriv}[2]{\frac{ \partial #1}{ \partial #2}}
+
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+
+\title{Structural Estimation Pset 4}
+\author{Timothy Schwieg}
+\begin{document}
+
+\maketitle
+
+The functions used to estimate this model are given below. Note that
+for the constrained optimization, the logit-transform is applied to
+transform the variables from the parameter space, which is bounded to
+$\setR^4$ which is unbounded. This allows the use of Unconstrained
+optimization libraries which are much more effective. In order to aid
+with the optimization process, automatic differentiation is applied to
+the objectives.
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+  function BuildSim( μ::Real, α::Real, ρ::Real, σ::Real, β::Real,
+                   S::Int64, T::Int64, initK::Real, c::Matrix{Real},
+                   k::Matrix{Real}, w::Matrix{Real},
+                   r::Matrix{Real}, y::Matrix{Real}, z::Matrix{Real},
+                   u::Matrix{Float64})
+    ϵ = σ*quantile.( Normal(), u)
+
+    for s in 1:S
+        z[s,1] = μ
+        k[s,1] = initK#mean(macroData[:K])
+        for t in 1:T
+            #We have z shift up by one to deal with the fact we are
+            #1-indexed.
+            #z[1] = $z_0$
+            z[s,t+1] = ρ*z[s,t] + (1-ρ)*μ + ϵ[s,t]
+            k[s,t+1] = α*β*exp(z[s,t+1])*k[s,t]^α
+            w[s,t] = (1-α)*exp(z[s,t+1])*k[s,t]^α
+            r[s,t] = α*exp(z[s,t+1])*k[s,t]^(α-1)
+            c[s,t] = r[s,t]*k[s,t] + w[s,t] - k[s,t+1]
+            y[s,t] = exp(z[s,t+1])*k[s,t]^α
+        end
+    end
+end
+
+function myVar( x::Vector{Real})
+    return (sum( x[i]*x[i] for i in 1:100 ) - sum(x)*sum(x) / 100.0) / 99.0
+end
+
+
+
+function BuildMoments( dC::Vector{Float64}, dK::Vector{Float64},
+                       dW::Vector{Float64}, dR::Vector{Float64},
+                       dY::Vector{Float64}, sC::Matrix{Real},
+                       sK::Matrix{Real}, sW::Matrix{Real},
+                       sR::Matrix{Real}, sY::Matrix{Real},
+                       momentBox::Vector{Real},S::Int64 )
+    momentBox[1] = ( mean(mean(sC[i,:] for i in 1:S)) - mean(dC)) / mean(dC)
+    momentBox[2] = (mean(mean(sK[i,:] for i in 1:S))- mean(dK) ) / mean(dK)
+    momentBox[3] = (mean( mean(sC[i,:] ./ sY[i,:] for i in 1:S)) - mean( dC ./ dY) ) / mean( dC ./ dY)
+    momentBox[4] = (mean([myVar(sY[i,:]) for i in 1:S]) - var( dY) ) / var(dY)
+    momentBox[5] = ( mean([cor(sC[i,1:99],sC[i,2:100]) for i in 1:S]) - cor(dC[1:99],dC[2:100])) / cor(dC[1:99],dC[2:100])
+    momentBox[6] = (mean( [cor(sC[i,:],sK[i,1:100]) for i in 1:S] ) - cor(dC,dK)) / cor(dC,dK)
+end
+
+
+
+
+function objective(μ::Real, α::Real, ρ::Real, σ::Real, β::Real,
+                   S::Int64, T::Int64, initK::Real, c::Matrix{Real},
+                   k::Matrix{Real}, w::Matrix{Real},
+                   r::Matrix{Real}, y::Matrix{Real}, z::Matrix{Real},
+                   u::Matrix{Float64}, dC::Vector{Float64}, dK::Vector{Float64},
+                   dW::Vector{Float64}, dR::Vector{Float64},
+                   dY::Vector{Float64}, W::Matrix{Real} )
+
+    m = Moments( μ, α, ρ, σ, β, S, T, initK, c, k, w, r, y, z, u, dC, dK, dW, dR, dY, W )
+    return dot( m, W*m)#sum( m[i]*m[i] for i in 1:6)
+end
+
+function Moments(μ::Real, α::Real, ρ::Real, σ::Real, β::Real,
+                   S::Int64, T::Int64, initK::Real, c::Matrix{Real},
+                   k::Matrix{Real}, w::Matrix{Real},
+                   r::Matrix{Real}, y::Matrix{Real}, z::Matrix{Real},
+                   u::Matrix{Float64}, dC::Vector{Float64}, dK::Vector{Float64},
+                   dW::Vector{Float64}, dR::Vector{Float64},
+                 dY::Vector{Float64}, W::Matrix{Real} )
+    BuildSim( μ, α, ρ, σ, β, S, T, initK, c, k, w, r, y, z, u)
+    m = Vector{Real}(undef,6)
+    BuildMoments( dC, dK, dW, dR, dY, c, k, w, r, y, m, S)
+    return m
+end
+\end{minted}
+
+The data is loaded, and objects are manipulated such that the
+optimization method can then work on them.
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+  macroData = DataFrame(load("data/NewMacroSeries.csv", header_exists=false, colnames=["C", "K", "W", "R", "Y"]))
+
+S = 1000
+T = 100
+u = rand(Uniform(0,1),S,T)
+
+ϵ = Matrix{Real}(undef,S,T)
+z = Matrix{Real}(undef,S,T+1)
+k = Matrix{Real}(undef,S,T+1)
+w = Matrix{Real}(undef,S,T)
+r = Matrix{Real}(undef,S,T)
+c = Matrix{Real}(undef,S,T)
+y = Matrix{Real}(undef,S,T)
+
+# The built in I will not cast to type Real
+# which we need to differentiate.
+W = Matrix{Real}(undef,6,6)
+W .= 0
+for i in 1:6
+    W[i,i] = 1.0
+end
+
+
+
+f(x) = objective( LogitTransform(x[1],5.0, 14.0),
+                  LogitTransform(x[2], .01, .99),
+                  LogitTransform(x[3], -.99, .99),
+                  LogitTransform(x[4], 0.01, 1.1),
+                  .99, S, T, mean(macroData[:K]), c, k, w, r, y, z, u, macroData[:C], macroData[:K], macroData[:W], macroData[:R], macroData[:Y], W)
+
+θ = [ InverLogit(5.0729,5.0, 14.0),
+      InverLogit(.70216, .01, .99),
+      InverLogit(.47972, -.99, .99),
+      InverLogit(.05, 0.01, 1.1) ]
+      
 results = optimize(f, θ, Newton(), autodiff=:forward)
+\end{minted}
+
+The results from this optimization are printed below:
+\begin{verbatim}
 Results of Optimization Algorithm
  * Algorithm: Newton's Method
  * Starting Point: [4.8077582340735585,-0.877412372562471, ...]
@@ -17,51 +237,110 @@ Results of Optimization Algorithm
  * Objective Calls: 227
  * Gradient Calls: 227
  * Hessian Calls: 69
+\end{verbatim}
 
+This minimum corresponds to the following parameter values estimated:
+
+\begin{centering}
+\begin{tabular}{ll}
+  $\mu$ & 9.932646978878989\\
+  $\alpha$ & 0.42103613802768947\\
+  $\rho$ & 0.9193643618762394 \\
+  $\sigma$ & 0.08951209454130482\\
+\end{tabular}
+  
+\end{centering}
+
+The final values of the moments are given below:
+
+\begin{equation*}
+ \est{m} = \begin{pmatrix}
+  0.0007300913579818042\\
+ -0.0007376556190434634\\
+ -0.0017558655381804127\\
+ -9.688593198418377 \times 10^{-9}\\
+  0.00029393694814873174\\
+  -0.00029131201720979767
+\end{pmatrix}  
+\end{equation*}
+
+The Jacobian of the moment function is then estimated via automatic
+differentiation, and the variance-covariance matrix estimated to
+compute the standard errors.
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
 answer = [LogitTransform(x[1],5.0, 14.0),
-+          LogitTransform(x[2], .01, .99),
-+          LogitTransform(x[3], -.99, .99),
-+          LogitTransform(x[4], 0.01, 1.1)]
-4-element Array{Float64,1}:
- 9.932646978878989  
- 0.42103613802768947
- 0.9193643618762394 
- 0.08951209454130482
+          LogitTransform(x[2], .01, .99),
+          LogitTransform(x[3], -.99, .99),
+          LogitTransform(x[4], 0.01, 1.1)]
+
+m(x) = Moments( x[1], x[2], x[3], x[4], .99, S, T,  mean(macroData[:K]), c, k, w, r, y, z, u, macroData[:C], macroData[:K], macroData[:W], macroData[:R], macroData[:Y], W)
 
 mom = m(answer)
-6-element Array{Real,1}:
-  0.0007300913579818042 
- -0.0007376556190434634 
- -0.0017558655381804127 
- -9.688593198418377e-9  
-  0.00029393694814873174
-  -0.00029131201720979767
+
+J = ForwardDiff.jacobian( m, answer )
 
 varMat = (1/S)*inv( J' * W*J)
-4×4 Array{Float64,2}:
-  0.0257529    -0.00151738   0.000250977   3.65533e-5
- -0.00151738    9.02329e-5  -2.74531e-5    1.36322e-6
-  0.000250977  -2.74531e-5   0.00232626   -0.00097449
-  3.65533e-5    1.36322e-6  -0.00097449    0.00041461
+stdErrors = [sqrt(varMat[i,i]) for i in 1:4]
+\end{minted}
 
-julia> stdErrors = [sqrt(varMat[i,i]) for i in 1:4]
-4-element Array{Float64,1}:
- 0.1604770701111893  
- 0.009499100361935424
- 0.048231362793496046
+These errors are given below:
+\begin{equation*}
+  \begin{pmatrix}
+0.1604770701111893\\  
+ 0.009499100361935424\\
+ 0.048231362793496046\\
  0.020361964338113037
-  
+  \end{pmatrix}
+\end{equation*}
+
+The optimal Weighting matrix is then constructed by using the $E$
+matrix as suggested in the notebook, and then summing over the
+outer-product of each simulation's contributions.
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+  dC = macroData[:C]
+dK = macroData[:K]
+dW = macroData[:W]
+dR = macroData[:R]
+dY = macroData[:Y]
+
+E = Matrix{Real}(undef,6,S)
+for i in 1:S
+    E[1,i] = (mean(c[i,:]) - mean(dC)) / mean(dC)
+    E[2,i] = (mean(k[i,:])- mean(dK) ) / mean(dK)
+    E[3,i] = (mean(c[i,:] ./ y[i,:] ) - mean( dC ./ dY) ) / mean( dC ./ dY)
+    E[4,i] = (myVar(y[i,:]) - var( dY) ) / var(dY)
+    E[5,i] = ( cor(c[i,1:99],c[i,2:100])-cor(dC[1:99],dC[2:100])) / cor(dC[1:99],dC[2:100])
+    E[6,i] = (cor(c[i,:],k[i,1:100]) - cor(dC,dK)) / cor(dC,dK)
+end
+
 
 wHat = convert( Matrix{Real},inv((1/S)*sum( E[:,i]*E[:,i]' for i in 1:S)))
-6×6 Array{Real,2}:
-    1.34386e16    -1.3593e16    1.12984e16    -7.39115  -75.1883      213.64     
-   -1.3593e16      1.37492e16  -1.14282e16    -4.0        0.0          -0.0      
-    1.12984e16    -1.14282e16   9.49896e15    66.3249     2.92331e5    -2.93297e5
-  -11.5272        -2.61035     64.7022         6.55609  156.546      -254.312    
-  905.516       -825.01         2.84224e5    156.546      8.4976e5     -8.51365e5
- -711.646        808.575       -2.85161e5   -254.312     -8.51365e5     8.55922e5
+\end{minted}
 
+The second stage of optimiation procedes as the first did, but with a
+different matrix specified. 
+
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+fOpt(x) = objective( LogitTransform(x[1],5.0, 14.0),
+                  LogitTransform(x[2], .01, .99),
+                  LogitTransform(x[3], -.99, .99),
+                  LogitTransform(x[4], 0.01, 1.1),
+                  .99, S, T, mean(macroData[:K]), c, k, w, r, y, z, u, macroData[:C], macroData[:K], macroData[:W], macroData[:R], macroData[:Y], wHat)
 resultsOpt = optimize(fOpt, x, Newton(), autodiff=:forward)
+
+xOpt = results.minimizer
+
+#μ, α, ρ, σ
+answerOpt = [LogitTransform(xOpt[1],5.0, 14.0),
+          LogitTransform(xOpt[2], .01, .99),
+          LogitTransform(xOpt[3], -.99, .99),
+          LogitTransform(xOpt[4], 0.01, 1.1)]
+\end{minted}
+The results of the optimization are printed below:
+\begin{verbatim}
 Results of Optimization Algorithm
  * Algorithm: Newton's Method
  * Starting Point: [-0.19288333200456412,0.32513578293163214, ...]
@@ -80,37 +359,55 @@ Results of Optimization Algorithm
  * Objective Calls: 175
  * Gradient Calls: 175
  * Hessian Calls: 8
+\end{verbatim}
+
+The values computed are as follows:
+
+\begin{centering}
+\begin{tabular}{ll}
+  $\mu$ & 9.932646978878989\\
+  $\alpha$ &  0.42103613802768947\\
+  $\rho$ & 0.9193643618762394\\
+  $\sigma$ & 0.08951209454130482
+\end{tabular}
+  
+\end{centering}
 
 
-answerOpt = [LogitTransform(xOpt[1],5.0, 14.0),
-+          LogitTransform(xOpt[2], .01, .99),
-+          LogitTransform(xOpt[3], -.99, .99),
-+          LogitTransform(xOpt[4], 0.01, 1.1)]
-4-element Array{Float64,1}:
- 9.932646978878989  
- 0.42103613802768947
- 0.9193643618762394 
- 0.08951209454130482
+The final values of the moments are given below:
+
+\begin{equation*}
+ \est{m} = \begin{pmatrix}
+  0.0007300913579818042\\
+ -0.0007376556190434634\\
+ -0.0017558655381804127\\
+ -9.688593198418377 \times 10^{-9}\\
+  0.00029393694814873174\\
+ -0.00029131201720979767
+\end{pmatrix}  
+\end{equation*}
+
+The standard errors are computed by the same procedure:
+
+\begin{minted}[frame=lines,fontsize=\scriptsize,xleftmargin=\parindent,linenos,mathescape,breaklines=true,stripnl=true,firstnumber=last]{julia}
+mOpt(x) = Moments( x[1], x[2], x[3], x[4], .99, S, T,  mean(macroData[:K]), c, k, w, r, y, z, u, macroData[:C], macroData[:K], macroData[:W], macroData[:R], macroData[:Y], wHat)
 
 momOpt = mOpt(answerOpt)
-6-element Array{Real,1}:
-  0.0007300913579818042 
- -0.0007376556190434634 
- -0.0017558655381804127 
- -9.688593198418377e-9  
-  0.00029393694814873174
- -0.00029131201720979767
 
-julia> varMatOpt = (1/S)*inv( JOpt' * wHat*JOpt )
-4×4 Array{Float64,2}:
-  9.31902e-6   -8.64973e-20  -9.14716e-7   -1.77834e-7
- -8.68942e-20   2.45955e-21  -1.56133e-20   4.4825e-21
- -8.25163e-7   -1.58937e-20   3.33612e-6   -4.34326e-7
-  4.91427e-8    2.99765e-21  -4.27854e-7    2.87901e-7
+JOpt = ForwardDiff.jacobian( m, answerOpt )
+varMatOpt = (1/S)*inv( JOpt' * wHat*JOpt )
+stdErrorsOpt = [sqrt(varMatOpt[i,i]) for i in 1:4]
+\end{minted}
 
-julia> stdErrorsOpt = [sqrt(varMatOpt[i,i]) for i in 1:4]
-4-element Array{Float64,1}:
- 0.003052707245892253  
- 4.9593863300683934e-11
- 0.0018265043575507948 
- 0.0005365640009272416 
+They are given below:
+\begin{equation*}
+  \begin{pmatrix}
+0.003052707245892253\\
+ 4.9593863300683934 \times 10^{-11}\\
+ 0.0018265043575507948\\
+ 0.0005365640009272416     
+  \end{pmatrix}
+\end{equation*}
+
+\end{document}
+  
