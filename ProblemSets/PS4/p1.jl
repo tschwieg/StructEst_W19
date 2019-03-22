@@ -17,13 +17,13 @@ S = 1000
 T = 100
 u = rand(Uniform(0,1),S,T)
 
-ϵ = Matrix{Real}(undef,S,T)
-z = Matrix{Real}(undef,S,T+1)
-k = Matrix{Real}(undef,S,T+1)
-w = Matrix{Real}(undef,S,T)
-r = Matrix{Real}(undef,S,T)
-c = Matrix{Real}(undef,S,T)
-y = Matrix{Real}(undef,S,T)
+ϵ = Matrix{Real}(S,T)
+z = Matrix{Real}(S,T+1)
+k = Matrix{Real}(S,T+1)
+w = Matrix{Real}(S,T)
+r = Matrix{Real}(S,T)
+c = Matrix{Real}(S,T)
+y = Matrix{Real}(S,T)
 
 function BuildSim( μ::Real, α::Real, ρ::Real, σ::Real, β::Real,
                    S::Int64, T::Int64, initK::Real, c::Matrix{Real},
@@ -98,7 +98,7 @@ function Moments(μ::Real, α::Real, ρ::Real, σ::Real, β::Real,
                    dW::Vector{Float64}, dR::Vector{Float64},
                  dY::Vector{Float64}, W::Matrix{Real} )
     BuildSim( μ, α, ρ, σ, β, S, T, initK, c, k, w, r, y, z, u)
-    m = Vector{Real}(undef,6)
+    m = Vector{Real}(6)
     BuildMoments( dC, dK, dW, dR, dY, c, k, w, r, y, m, S)
     return m
 end
@@ -114,7 +114,7 @@ function InverLogit( x::Real, upper::Float64, lower::Float64)
     return log( (x - lower) / (upper - x))
 end
 
-W = Matrix{Real}(undef,6,6)
+W = Matrix{Real}(6,6)
 W .= 0
 for i in 1:6
     W[i,i] = 1.0
@@ -161,7 +161,7 @@ dW = macroData[:W]
 dR = macroData[:R]
 dY = macroData[:Y]
 
-E = Matrix{Real}(undef,6,S)
+E = Matrix{Real}(6,S)
 for i in 1:S
     #println(i)
     E[1,i] = (mean(c[i,:]) - mean(dC)) / mean(dC)
